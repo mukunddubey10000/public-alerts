@@ -506,7 +506,7 @@ install_android_sdk() {
   if ! (yes | sdkmanager --licenses 2>/dev/null); then
     warn "License acceptance had issues — continuing anyway"
   fi
-  if ! sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"; then
+  if ! sdkmanager "platform-tools" "platforms;android-31" "build-tools;30.0.3"; then
     fail "sdkmanager install failed. Check Java installation and network."
     return 1
   fi

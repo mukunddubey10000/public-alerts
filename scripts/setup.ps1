@@ -425,10 +425,9 @@ function Install-AndroidSdk {
     $sdkmanager = "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat"
     "y" | & $sdkmanager --licenses 2>$null
     if ($LASTEXITCODE -ne 0) {
-        Write-Fail "sdkmanager --licenses failed (exit code $LASTEXITCODE)"
-        return
+        Write-Warn "sdkmanager --licenses returned exit code $LASTEXITCODE (continuing anyway)"
     }
-    & $sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+    & $sdkmanager "platform-tools" "platforms;android-31" "build-tools;30.0.3"
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "sdkmanager install failed (exit code $LASTEXITCODE)"
         return
@@ -495,25 +494,30 @@ if (Get-Command adb -ErrorAction SilentlyContinue) {
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""
 Write-Info "Checking React Native CLI..."
-$null = npx react-native --version 2>$null
-if ($LASTEXITCODE -eq 0) {
-    Write-Ok "react-native CLI available (via npx)"
+$projectDir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
+if (Test-Path "$projectDir\node_modules\.bin\react-native.cmd") {
+    Write-Ok "react-native CLI available (local)"
+} elseif (Get-Command react-native -ErrorAction SilentlyContinue) {
+    Write-Ok "react-native CLI available (global)"
 } else {
-    Write-Warn "react-native CLI not accessible. Will be available after npm install."
+    Write-Warn "react-native CLI not found yet. Will be available after npm install."
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 6. npm install
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""
-$projectDir = Split-Path -Parent (Split-Path -Parent $PSCommandPath)
 
 if (-not (Test-Path "$projectDir\node_modules")) {
     Write-Info "Installing npm dependencies..."
     Push-Location $projectDir
     npm install
     Pop-Location
-    Write-Ok "Dependencies installed"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "npm install failed (exit code $LASTEXITCODE)"
+    } else {
+        Write-Ok "Dependencies installed"
+    }
 } else {
     Write-Ok "node_modules already exists. Run 'npm install' to update."
 }
