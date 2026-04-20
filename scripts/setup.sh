@@ -74,10 +74,8 @@ persist_env() {
   local var_name="$1"
   local var_value="$2"
 
-  # Validate path exists before persisting
   if [[ ! -d "$var_value" ]]; then
-    warn "Cannot set $var_name - path does not exist: $var_value"
-    return 1
+    warn "Path does not exist yet: $var_value (setting $var_name anyway for future sessions)"
   fi
 
   # Export in current session
@@ -106,10 +104,8 @@ persist_env() {
 persist_path_entry() {
   local entry="$1"
 
-  # Validate directory exists before persisting
   if [[ ! -d "$entry" ]]; then
-    warn "Cannot add to PATH - directory does not exist: $entry"
-    return 1
+    warn "Directory does not exist yet: $entry (adding to PATH anyway for future sessions)"
   fi
 
   # Add to current session

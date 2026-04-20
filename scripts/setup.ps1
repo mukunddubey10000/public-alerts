@@ -33,27 +33,32 @@ function Install-WithPkgManager ($name, $wingetId, $chocoId) {
 
 # ─── Refresh PATH within the current session ─────────────────────────────────
 function Refresh-Path {
-    $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" +
-                [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $machinePath = [System.Environment]::GetEnvironmentVariable("Path", "Machine")
+    $userPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+    $env:Path = "$machinePath;$userPath"
 }
 
 # ─── Persist an env var to User environment ───────────────────────────────────
-function Set-PersistentEnv ($varName, $varValue) {    if (-not (Test-Path $varValue)) {
-        Write-Warn "Cannot set $varName - path does not exist: $varValue"
-        return
-    }    Set-Item -Path "Env:\$varName" -Value $varValue
+function Set-PersistentEnv ($varName, $varValue) {
+    if (-not (Test-Path $varValue)) {
+        Write-Warn "Path does not exist yet: $varValue (setting $varName anyway for future sessions)"
+    }
+    Set-Item -Path "Env:\$varName" -Value $varValue
     [System.Environment]::SetEnvironmentVariable($varName, $varValue, "User")
     Write-Ok "Set $varName = $varValue (User environment)"
     $script:EnvChanged = $true
 }
 
 # ─── Append to User PATH if not already there ────────────────────────────────
-function Add-PersistentPath ($entry) {    if (-not (Test-Path $entry)) {
-        Write-Warn "Cannot add to PATH - directory does not exist: $entry"
-        return
-    }    $currentUserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+function Add-PersistentPath ($entry) {
+    # Always persist to registry (dir may be created later or in next session)
+    $currentUserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
     if ($currentUserPath -and $currentUserPath.ToLower().Contains($entry.ToLower())) {
-        return  # already present
+        # Already in User PATH registry — just ensure current session has it too
+        if (-not $env:Path.ToLower().Contains($entry.ToLower())) {
+            $env:Path = "$entry;$env:Path"
+        }
+        return
     }
     if ($currentUserPath) {
         $newPath = "$currentUserPath;$entry"
@@ -539,6 +544,23 @@ if (Get-Command adb -ErrorAction SilentlyContinue) {
             Write-Fail "Could not install Android SDK. Install Android Studio manually from https://developer.android.com/studio"
         }
     }
+}
+
+# Final adb verification
+Write-Host ""
+Write-Info "Verifying adb is usable..."
+Refresh-Path
+if (Get-Command adb -ErrorAction SilentlyContinue) {
+    $adbVer = adb version 2>&1 | Select-Object -First 1
+    Write-Ok "adb works: $adbVer"
+} elseif ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\platform-tools\adb.exe")) {
+    $adbVer = & "$detectedAndroidHome\platform-tools\adb.exe" version 2>&1 | Select-Object -First 1
+    Write-Ok "adb works (via full path): $adbVer"
+    Write-Warn "adb is not on PATH in this session. Open a new terminal for it to work."
+} else {
+    Write-Fail "adb is NOT available. Android builds will fail."
+    Write-Info "  Try: Open a NEW PowerShell window and run 'adb version'"
+    Write-Info "  If that fails, install Android Studio from https://developer.android.com/studio"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
