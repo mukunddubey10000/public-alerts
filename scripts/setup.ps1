@@ -308,6 +308,7 @@ function Install-AndroidSdk {
     $prevPref = $ProgressPreference
     $ProgressPreference = 'SilentlyContinue'
     try {
+        Add-Type -AssemblyName System.Net.Http
         $httpClient = New-Object System.Net.Http.HttpClient
         $httpClient.Timeout = [TimeSpan]::FromMinutes(10)
         $response = $httpClient.GetAsync($toolsUrl, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
