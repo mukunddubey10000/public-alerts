@@ -366,7 +366,16 @@ if (Get-Command adb -ErrorAction SilentlyContinue) {
         & "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat" "platform-tools"
         Write-Ok "adb installed via sdkmanager"
     } else {
-        Write-Fail "Cannot install adb without Android SDK."
+        Write-Warn "Android SDK not available either. Installing full Android SDK first..."
+        Install-AndroidSdk
+        if ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat")) {
+            & "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat" "platform-tools"
+            Set-PersistentEnv "ANDROID_HOME" $detectedAndroidHome
+            Add-PersistentPath "$detectedAndroidHome\platform-tools"
+            Write-Ok "Android SDK + adb installed at $detectedAndroidHome"
+        } else {
+            Write-Fail "Could not install Android SDK. Install Android Studio manually from https://developer.android.com/studio"
+        }
     }
 }
 

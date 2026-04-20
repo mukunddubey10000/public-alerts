@@ -500,7 +500,16 @@ else
     "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
     ok "adb installed via sdkmanager"
   else
-    install_pkg "android-platform-tools" "android-platform-tools" "android-tools-adb"
+    warn "Android SDK not available either. Installing full Android SDK first..."
+    install_android_sdk
+    if [[ -n "${DETECTED_ANDROID_HOME:-}" && -x "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
+      "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
+      persist_env "ANDROID_HOME" "$DETECTED_ANDROID_HOME"
+      persist_path_entry "$DETECTED_ANDROID_HOME/platform-tools"
+      ok "Android SDK + adb installed at $DETECTED_ANDROID_HOME"
+    else
+      fail "Could not install Android SDK. Install Android Studio manually from https://developer.android.com/studio"
+    fi
   fi
 fi
 

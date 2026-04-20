@@ -27,7 +27,9 @@ if (isWindows) {
   }
 } else {
   var sh = path.join(scriptsDir, "setup.sh");
-  console.log("[INFO]  Detected " + process.platform + " — running bash setup...\n");
+  console.log(
+    "[INFO]  Detected " + process.platform + " — running bash setup...\n",
+  );
   try {
     execSync('bash "' + sh + '"', { stdio: "inherit" });
   } catch (e) {
