@@ -163,23 +163,97 @@ ensure_prereqs() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. Node.js
+# 1. Node.js — pinned version via nvm
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# Required Node version (must match .nvmrc)
+REQUIRED_NODE_MAJOR=16
+
 echo ""
-info "Checking Node.js..."
-if command -v node &>/dev/null; then
-  ok "Node.js $(node -v)"
+info "Checking Node.js (requires v${REQUIRED_NODE_MAJOR}.x)..."
+
+# ─── Load nvm if available ────────────────────────────────────────────────────
+load_nvm() {
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  # Source nvm from common locations
+  if [[ -s "$NVM_DIR/nvm.sh" ]]; then
+    . "$NVM_DIR/nvm.sh"
+    return 0
+  fi
+  # Homebrew nvm
+  local brew_prefix
+  brew_prefix="$(brew --prefix 2>/dev/null || echo "")"
+  if [[ -n "$brew_prefix" && -s "$brew_prefix/opt/nvm/nvm.sh" ]]; then
+    . "$brew_prefix/opt/nvm/nvm.sh"
+    return 0
+  fi
+  return 1
+}
+
+# ─── Install nvm if not present ───────────────────────────────────────────────
+install_nvm() {
+  info "Installing nvm (Node Version Manager)..."
+  ensure_prereqs
+  curl -fsSL https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.7/install.sh | bash
+  export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
+  . "$NVM_DIR/nvm.sh"
+  ok "nvm installed"
+}
+
+# ─── Check if current node version is compatible ─────────────────────────────
+check_node_version() {
+  if ! command -v node &>/dev/null; then
+    return 1
+  fi
+  local ver
+  ver="$(node -v | sed 's/^v//' | cut -d. -f1)"
+  if [[ "$ver" -ge "$REQUIRED_NODE_MAJOR" && "$ver" -lt 19 ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# ─── Main Node.js setup logic ────────────────────────────────────────────────
+if check_node_version; then
+  ok "Node.js $(node -v) (compatible)"
 else
-  warn "Node.js not found."
-  install_pkg "Node.js" "node" "nodejs" "nodejs" "nodejs"
+  if command -v node &>/dev/null; then
+    warn "Node.js $(node -v) found but not compatible (need v${REQUIRED_NODE_MAJOR}.x - v18.x)"
+  else
+    warn "Node.js not found."
+  fi
+
+  # Try loading nvm
+  if ! load_nvm; then
+    install_nvm
+  fi
+
+  # Install and use the required version
+  info "Installing Node.js v${REQUIRED_NODE_MAJOR} via nvm..."
+  nvm install "$REQUIRED_NODE_MAJOR"
+  nvm use "$REQUIRED_NODE_MAJOR"
+  nvm alias default "$REQUIRED_NODE_MAJOR"
+
+  # Persist nvm init in shell profile if not already there
+  if ! grep -qF 'NVM_DIR' "$SHELL_PROFILE" 2>/dev/null; then
+    {
+      echo ""
+      echo "# nvm (added by CivicAlerts setup)"
+      echo "export NVM_DIR=\"\$HOME/.nvm\""
+      echo "[ -s \"\$NVM_DIR/nvm.sh\" ] && . \"\$NVM_DIR/nvm.sh\""
+    } >> "$SHELL_PROFILE"
+    ok "Added nvm init to $SHELL_PROFILE"
+    ENV_CHANGED=true
+  fi
+
+  ok "Node.js $(node -v) installed via nvm"
 fi
 
 info "Checking npm..."
 if command -v npm &>/dev/null; then
   ok "npm $(npm -v)"
 else
-  warn "npm not found."
-  install_pkg "npm" "node" "npm"
+  warn "npm not found. It should come with Node.js — try restarting your terminal."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════

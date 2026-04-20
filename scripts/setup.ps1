@@ -88,29 +88,88 @@ $drives = Get-DriveLetters
 Write-Info "Available drives: $($drives -join ', '):"
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# 1. Node.js
+# 1. Node.js — pinned version via nvm-windows
 # ═══════════════════════════════════════════════════════════════════════════════
+
+# Required Node version (must match .nvmrc)
+$RequiredNodeMajor = 16
+$RequiredNodeMinMajor = 16
+$RequiredNodeMaxMajor = 18  # inclusive
+
 Write-Host ""
-Write-Info "Checking Node.js..."
-if (Get-Command node -ErrorAction SilentlyContinue) {
-    Write-Ok "Node.js $(node -v)"
-} else {
-    # Scan for existing node installation
-    $nodeCandidates = @()
-    foreach ($d in $drives) {
-        $nodeCandidates += "${d}:\Program Files\nodejs\node.exe"
-        $nodeCandidates += "${d}:\Program Files (x86)\nodejs\node.exe"
-        $nodeCandidates += "$env:APPDATA\nvm\*\node.exe"
-    }
-    $found = Find-FirstPath $nodeCandidates
-    if ($found) {
-        $nodeDir = Split-Path $found
-        Add-PersistentPath $nodeDir
+Write-Info "Checking Node.js (requires v${RequiredNodeMinMajor}.x - v${RequiredNodeMaxMajor}.x)..."
+
+function Test-NodeVersion {
+    $nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+    if (-not $nodeCmd) { return $false }
+    $ver = (node -v) -replace '^v', ''
+    $major = [int]($ver.Split('.')[0])
+    return ($major -ge $RequiredNodeMinMajor -and $major -le $RequiredNodeMaxMajor)
+}
+
+function Find-NvmWindows {
+    # Check if nvm command exists (nvm-windows)
+    if (Get-Command nvm -ErrorAction SilentlyContinue) { return $true }
+    # Check common install location
+    $nvmPath = "$env:APPDATA\nvm\nvm.exe"
+    if (Test-Path $nvmPath) {
+        Add-PersistentPath "$env:APPDATA\nvm"
         Refresh-Path
-        Write-Ok "Node.js found at $found, added to PATH"
+        return $true
+    }
+    return $false
+}
+
+function Install-NvmWindows {
+    Write-Info "Installing nvm-windows (Node Version Manager)..."
+    $nvmVersion = "1.1.12"
+    $nvmUrl = "https://github.com/coreybutler/nvm-windows/releases/download/$nvmVersion/nvm-setup.exe"
+    $nvmInstaller = "$env:TEMP\nvm-setup.exe"
+
+    [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+    Invoke-WebRequest -Uri $nvmUrl -OutFile $nvmInstaller -UseBasicParsing
+
+    Write-Info "Running nvm-windows installer (follow the prompts)..."
+    Start-Process -FilePath $nvmInstaller -Wait
+    Remove-Item $nvmInstaller -Force -ErrorAction SilentlyContinue
+
+    Refresh-Path
+    if (Get-Command nvm -ErrorAction SilentlyContinue) {
+        Write-Ok "nvm-windows installed"
     } else {
-        Write-Warn "Node.js not found anywhere."
-        Install-WithPkgManager "Node.js" "OpenJS.NodeJS.LTS" "nodejs-lts"
+        Write-Warn "nvm-windows installed but not on PATH yet. Restart your terminal after setup."
+    }
+}
+
+if (Test-NodeVersion) {
+    Write-Ok "Node.js $(node -v) (compatible)"
+} else {
+    if (Get-Command node -ErrorAction SilentlyContinue) {
+        Write-Warn "Node.js $(node -v) found but not compatible (need v${RequiredNodeMinMajor}.x - v${RequiredNodeMaxMajor}.x)"
+    } else {
+        Write-Warn "Node.js not found."
+    }
+
+    # Try to use nvm-windows
+    if (-not (Find-NvmWindows)) {
+        Install-NvmWindows
+    }
+
+    if (Get-Command nvm -ErrorAction SilentlyContinue) {
+        Write-Info "Installing Node.js v$RequiredNodeMajor via nvm..."
+        nvm install $RequiredNodeMajor
+        nvm use $RequiredNodeMajor
+        Refresh-Path
+
+        if (Test-NodeVersion) {
+            Write-Ok "Node.js $(node -v) installed via nvm-windows"
+        } else {
+            Write-Warn "Node installed but version check failed. Restart your terminal."
+        }
+    } else {
+        # Fallback: direct install of Node 16 LTS via winget/choco
+        Write-Warn "nvm not available. Installing Node.js v$RequiredNodeMajor directly..."
+        Install-WithPkgManager "Node.js $RequiredNodeMajor" "OpenJS.NodeJS.LTS" "nodejs-lts"
         Refresh-Path
     }
 }
