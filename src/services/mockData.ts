@@ -1,4 +1,3 @@
-import { v4 as uuidv4 } from 'uuid';
 import { Incident, Location, User, Notification } from '../types';
 import { getDistanceKm, isWithinRadius } from '../utils/geo';
 
@@ -15,7 +14,7 @@ export const DEFAULT_USER_LOCATION: Location = {
 
 // Current user mock
 const CURRENT_USER: User = {
-  id: uuidv4(),
+  id: Math.random().toString(36).substr(2, 9),
   name: 'John Doe',
   location: DEFAULT_USER_LOCATION,
   notificationRadius: 5, // 5 km
@@ -25,7 +24,7 @@ const CURRENT_USER: User = {
 // Mock incidents database
 let INCIDENTS_DB: Incident[] = [
   {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type: 'ACCIDENT',
     description: 'Car collision on MG Road near Vidhana Soudha',
     location: { lat: 12.9747, lng: 77.5906 },
@@ -35,7 +34,7 @@ let INCIDENTS_DB: Incident[] = [
     status: 'ACTIVE',
   },
   {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type: 'OUTAGE',
     description: 'Power cut in Koramangala Block 1 and 2',
     location: { lat: 12.9352, lng: 77.6245 },
@@ -45,7 +44,7 @@ let INCIDENTS_DB: Incident[] = [
     status: 'ACTIVE',
   },
   {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type: 'CONSTRUCTION',
     description: 'Road work on Sarjapur Road - expect delays',
     location: { lat: 12.9095, lng: 77.6277 },
@@ -55,7 +54,7 @@ let INCIDENTS_DB: Incident[] = [
     status: 'ACTIVE',
   },
   {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type: 'HAZARD',
     description: 'Potholes on Whitefield Road causing accidents',
     location: { lat: 12.9698, lng: 77.7499 },
@@ -65,7 +64,7 @@ let INCIDENTS_DB: Incident[] = [
     status: 'ACTIVE',
   },
   {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type: 'ACCIDENT',
     description: 'Two wheeler accident near Indiranagar',
     location: { lat: 12.9716, lng: 77.6412 },
@@ -75,7 +74,7 @@ let INCIDENTS_DB: Incident[] = [
     status: 'ACTIVE',
   },
   {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type: 'OUTAGE',
     description: 'Water supply disruption in Marathahalli',
     location: { lat: 12.9689, lng: 77.6994 },
@@ -144,7 +143,7 @@ export const createIncident = (
   imageUrl?: string
 ): Incident => {
   const newIncident: Incident = {
-    id: uuidv4(),
+    id: Math.random().toString(36).substr(2, 9),
     type,
     description,
     location,
@@ -234,7 +233,7 @@ const simulateNotificationTrigger = (incident: Incident): void => {
   ) {
     const distance = getDistanceKm(CURRENT_USER.location, incident.location);
     const notification: Notification = {
-      id: uuidv4(),
+      id: Math.random().toString(36).substr(2, 9),
       title: `New ${incident.type} near you (${distance.toFixed(1)} km away)`,
       body: incident.description || `A ${incident.type} has been reported`,
       incidentId: incident.id,
