@@ -441,8 +441,14 @@ install_android_sdk() {
   # Ensure curl and unzip are available
   ensure_prereqs
 
-  info "Downloading Android command-line tools..."
-  curl -fSL "$TOOLS_URL" -o "$TMP_ZIP"
+  info "Downloading Android command-line tools (~150 MB, may take a few minutes)..."
+  curl --progress-bar --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 600 \
+    -fSL "$TOOLS_URL" -o "$TMP_ZIP"
+
+  if [[ ! -s "$TMP_ZIP" ]]; then
+    fail "Download failed or file is empty. Check your internet connection."
+    return 1
+  fi
 
   info "Extracting..."
   unzip -qo "$TMP_ZIP" -d "$SDK_DIR/cmdline-tools"

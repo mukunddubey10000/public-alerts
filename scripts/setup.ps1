@@ -301,9 +301,27 @@ function Install-AndroidSdk {
     $toolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
     $tmpZip = "$env:TEMP\android-cmdline-tools.zip"
 
-    Write-Info "Downloading Android command-line tools..."
+    Write-Info "Downloading Android command-line tools (~150 MB, may take a few minutes)..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-    Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+
+    # Disable the PowerShell progress bar — it tanks download speed to near-zero
+    $prevPref = $ProgressPreference
+    $ProgressPreference = 'SilentlyContinue'
+    try {
+        # Try .NET WebClient first (much faster than Invoke-WebRequest)
+        $wc = New-Object System.Net.WebClient
+        $wc.DownloadFile($toolsUrl, $tmpZip)
+    } catch {
+        Write-Warn "WebClient failed, falling back to Invoke-WebRequest..."
+        Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+    } finally {
+        $ProgressPreference = $prevPref
+    }
+
+    if (-not (Test-Path $tmpZip) -or (Get-Item $tmpZip).Length -lt 1000000) {
+        Write-Fail "Download failed or file is too small. Check your internet connection."
+        return
+    }
 
     Write-Info "Extracting to $sdkDir..."
     Expand-Archive -Path $tmpZip -DestinationPath "$sdkDir\cmdline-tools" -Force
