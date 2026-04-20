@@ -195,6 +195,15 @@ if (Get-Command npm -ErrorAction SilentlyContinue) {
 Write-Host ""
 Write-Info "Checking JDK..."
 
+# Validate existing JAVA_HOME first - clear if invalid BEFORE detection
+if ($env:JAVA_HOME -and -not (Test-Path "$env:JAVA_HOME\bin\javac.exe")) {
+    Write-Warn "Existing JAVA_HOME is invalid: $env:JAVA_HOME"
+    Write-Info "Clearing stale JAVA_HOME..."
+    [System.Environment]::SetEnvironmentVariable("JAVA_HOME", $null, "User")
+    $env:JAVA_HOME = $null
+    $script:EnvChanged = $true
+}
+
 function Find-JavaHome {
     # 1) If javac is already on PATH
     $javacCmd = Get-Command javac -ErrorAction SilentlyContinue
@@ -206,25 +215,26 @@ function Find-JavaHome {
     # 2) Scan known directories across all drives (C: first)
     $jdkCandidates = @()
     foreach ($d in $drives) {
-        # Microsoft OpenJDK
-        $jdkCandidates += "${d}:\Program Files\Microsoft\jdk-17*"
-        $jdkCandidates += "${d}:\Program Files\Microsoft\jdk-21*"
-        # Oracle / Temurin / Zulu / Corretto
-        $jdkCandidates += "${d}:\Program Files\Java\jdk-17*"
-        $jdkCandidates += "${d}:\Program Files\Java\jdk-21*"
+        # Microsoft OpenJDK (all common versions)
+        foreach ($ver in @(17, 21, 22, 23, 24, 25, 26)) {
+            $jdkCandidates += "${d}:\Program Files\Microsoft\jdk-${ver}*"
+        }
+        # Oracle / Temurin / Zulu / Corretto (all versions)
         $jdkCandidates += "${d}:\Program Files\Java\jdk*"
-        $jdkCandidates += "${d}:\Program Files\Eclipse Adoptium\jdk-17*"
-        $jdkCandidates += "${d}:\Program Files\Eclipse Adoptium\jdk-21*"
-        $jdkCandidates += "${d}:\Program Files\Zulu\zulu-17*"
-        $jdkCandidates += "${d}:\Program Files\Amazon Corretto\jdk17*"
+        foreach ($ver in @(17, 21, 22, 23, 24, 25, 26)) {
+            $jdkCandidates += "${d}:\Program Files\Eclipse Adoptium\jdk-${ver}*"
+            $jdkCandidates += "${d}:\Program Files\Zulu\zulu-${ver}*"
+            $jdkCandidates += "${d}:\Program Files\Amazon Corretto\jdk${ver}*"
+        }
         # x86 variants
         $jdkCandidates += "${d}:\Program Files (x86)\Java\jdk*"
         # Android Studio bundled JDK
         $jdkCandidates += "${d}:\Program Files\Android\Android Studio\jbr"
         $jdkCandidates += "${d}:\Program Files\Android\Android Studio\jre"
     }
-    # User-level
+    # User-level (IntelliJ, sdkman-like)
     $jdkCandidates += "$env:USERPROFILE\.jdks\*"
+    $jdkCandidates += "$env:LOCALAPPDATA\Programs\Eclipse Adoptium\*"
 
     foreach ($pattern in $jdkCandidates) {
         $resolved = Resolve-Path -Path $pattern -ErrorAction SilentlyContinue
@@ -249,38 +259,33 @@ if ($detectedJavaHome) {
     Install-WithPkgManager "JDK 17" "Microsoft.OpenJDK.17" "openjdk17"
     Refresh-Path
     $detectedJavaHome = Find-JavaHome
+    if (-not $detectedJavaHome) {
+        # Try harder: search everywhere for javac.exe
+        Write-Info "Scanning all drives for javac.exe (this may take a moment)..."
+        foreach ($d in $drives) {
+            $found = Get-ChildItem -Path "${d}:\Program Files*" -Recurse -Filter "javac.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+            if ($found) {
+                $detectedJavaHome = Split-Path (Split-Path $found.FullName)
+                break
+            }
+        }
+    }
     if ($detectedJavaHome) {
         Write-Ok "JDK 17 installed at $detectedJavaHome"
     } else {
-        Write-Warn "JDK installed but could not auto-detect path. You may need to set JAVA_HOME manually."
+        Write-Fail "JDK installed but could not auto-detect path. You may need to set JAVA_HOME manually."
     }
-}
-
-# Validate existing JAVA_HOME — clear it if it points to a bad path
-if ($env:JAVA_HOME -and -not (Test-Path "$env:JAVA_HOME\bin\javac.exe")) {
-    Write-Warn "Existing JAVA_HOME is invalid: $env:JAVA_HOME"
-    Write-Info "Clearing stale JAVA_HOME..."
-    [System.Environment]::SetEnvironmentVariable("JAVA_HOME", $null, "User")
-    $env:JAVA_HOME = $null
-    $script:EnvChanged = $true
 }
 
 # Set JAVA_HOME persistently right after install
 if ($detectedJavaHome) {
-    if ($env:JAVA_HOME -ne $detectedJavaHome) {
-        Set-PersistentEnv "JAVA_HOME" $detectedJavaHome
-    } else {
-        Write-Ok "JAVA_HOME already set: $env:JAVA_HOME"
-    }
+    Set-PersistentEnv "JAVA_HOME" $detectedJavaHome
     Add-PersistentPath "$detectedJavaHome\bin"
     # Verify it works
-    Write-Info "Verifying JAVA_HOME..."
-    if (Test-Path "$env:JAVA_HOME\bin\javac.exe") {
-        $verifyVer = & "$env:JAVA_HOME\bin\javac.exe" -version 2>&1
-        Write-Ok "JAVA_HOME verified: $env:JAVA_HOME ($verifyVer)"
-    } else {
-        Write-Fail "JAVA_HOME verification failed. javac not found at $env:JAVA_HOME\bin\javac.exe"
-    }
+    $verifyVer = & "$env:JAVA_HOME\bin\javac.exe" -version 2>&1
+    Write-Ok "JAVA_HOME verified: $env:JAVA_HOME ($verifyVer)"
+} else {
+    Write-Fail "JAVA_HOME could not be set. Install JDK 17 manually and set JAVA_HOME."
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -523,6 +528,52 @@ if (Get-Command adb -ErrorAction SilentlyContinue) {
             Write-Fail "Could not install Android SDK. Install Android Studio manually from https://developer.android.com/studio"
         }
     }
+}
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4b. Connected devices check
+# ═══════════════════════════════════════════════════════════════════════════════
+Write-Host ""
+Write-Info "Checking for connected Android devices..."
+
+$adbCmd = $null
+if (Get-Command adb -ErrorAction SilentlyContinue) {
+    $adbCmd = "adb"
+} elseif ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\platform-tools\adb.exe")) {
+    $adbCmd = "$detectedAndroidHome\platform-tools\adb.exe"
+}
+
+if ($adbCmd) {
+    $devices = & $adbCmd devices 2>&1
+    $connectedDevices = ($devices | Select-String -Pattern "^\S+\s+(device|unauthorized|offline)" | Measure-Object).Count
+    $unauthorizedDevices = ($devices | Select-String -Pattern "unauthorized" | Measure-Object).Count
+
+    if ($connectedDevices -eq 0) {
+        Write-Warn "No Android devices detected."
+        Write-Info "  To install on a physical device:"
+        Write-Info "    1. Enable Developer Options: Settings > About Phone > tap 'Build Number' 7 times"
+        Write-Info "    2. Enable USB Debugging: Settings > Developer Options > USB Debugging"
+        Write-Info "    3. Connect phone via USB cable"
+        Write-Info "    4. When prompted on phone, tap 'Allow USB Debugging'"
+        Write-Info "    5. Run this setup script again or run: adb devices"
+    } elseif ($unauthorizedDevices -gt 0) {
+        Write-Warn "Device connected but not authorized."
+        Write-Info "  Check your phone - tap 'Allow USB Debugging' on the popup."
+        Write-Info "  If no popup appears, try: adb kill-server && adb devices"
+    } else {
+        $deviceList = $devices | Select-String -Pattern "^\S+\s+device$"
+        foreach ($dev in $deviceList) {
+            $devId = ($dev -split "\s+")[0]
+            $model = (& $adbCmd -s $devId shell getprop ro.product.model 2>$null)
+            if ($model) {
+                Write-Ok "Device connected: $model ($devId)"
+            } else {
+                Write-Ok "Device connected: $devId"
+            }
+        }
+    }
+} else {
+    Write-Warn "adb not available - cannot check for connected devices."
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

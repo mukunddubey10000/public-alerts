@@ -274,6 +274,19 @@ fi
 echo ""
 info "Checking JDK..."
 
+# Validate existing JAVA_HOME first - clear if invalid BEFORE detection
+if [[ -n "${JAVA_HOME:-}" && ! -x "$JAVA_HOME/bin/javac" ]]; then
+  warn "Existing JAVA_HOME is invalid: $JAVA_HOME"
+  info "Clearing stale JAVA_HOME from $SHELL_PROFILE..."
+  if [[ "$PLATFORM" == "mac" ]]; then
+    sed -i '' '/^export JAVA_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  else
+    sed -i '/^export JAVA_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  fi
+  unset JAVA_HOME
+  ENV_CHANGED=true
+fi
+
 detect_java_home() {
   # 1) If javac is on PATH and actually works (macOS has a stub at /usr/bin/javac)
   if command -v javac &>/dev/null; then
@@ -378,34 +391,18 @@ else
   ok "JDK 17 installed at $DETECTED_JAVA_HOME"
 fi
 
-# Validate existing JAVA_HOME - clear it if it points to a bad path
-if [[ -n "${JAVA_HOME:-}" && ! -x "$JAVA_HOME/bin/javac" ]]; then
-  warn "Existing JAVA_HOME is invalid: $JAVA_HOME"
-  info "Clearing stale JAVA_HOME from $SHELL_PROFILE..."
-  if [[ "$PLATFORM" == "mac" ]]; then
-    sed -i '' '/^export JAVA_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
-  else
-    sed -i '/^export JAVA_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
-  fi
-  unset JAVA_HOME
-  ENV_CHANGED=true
-fi
-
 # Set JAVA_HOME persistently right after install
 if [[ -n "$DETECTED_JAVA_HOME" ]]; then
-  if [[ "${JAVA_HOME:-}" != "$DETECTED_JAVA_HOME" ]]; then
-    persist_env "JAVA_HOME" "$DETECTED_JAVA_HOME"
-  else
-    ok "JAVA_HOME already set: $JAVA_HOME"
-  fi
+  persist_env "JAVA_HOME" "$DETECTED_JAVA_HOME"
   # Verify it works
-  info "Verifying JAVA_HOME..."
   if [[ -x "$JAVA_HOME/bin/javac" ]]; then
     VERIFY_VER="$("$JAVA_HOME/bin/javac" -version 2>&1)"
     ok "JAVA_HOME verified: $JAVA_HOME ($VERIFY_VER)"
   else
     fail "JAVA_HOME verification failed. javac not found at $JAVA_HOME/bin/javac"
   fi
+else
+  fail "JAVA_HOME could not be set. Install JDK 17 manually and set JAVA_HOME."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -413,6 +410,19 @@ fi
 # ═══════════════════════════════════════════════════════════════════════════════
 echo ""
 info "Checking Android SDK..."
+
+# Validate existing ANDROID_HOME first - clear if invalid BEFORE detection
+if [[ -n "${ANDROID_HOME:-}" && ! -d "$ANDROID_HOME" ]]; then
+  warn "Existing ANDROID_HOME is invalid: $ANDROID_HOME"
+  info "Clearing stale ANDROID_HOME from $SHELL_PROFILE..."
+  if [[ "$PLATFORM" == "mac" ]]; then
+    sed -i '' '/^export ANDROID_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  else
+    sed -i '/^export ANDROID_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  fi
+  unset ANDROID_HOME
+  ENV_CHANGED=true
+fi
 
 detect_android_home() {
   # 1) Check env vars
@@ -570,24 +580,19 @@ fi
 
 # Set ANDROID_HOME persistently right after install
 if [[ -n "$DETECTED_ANDROID_HOME" ]]; then
-  if [[ "${ANDROID_HOME:-}" != "$DETECTED_ANDROID_HOME" ]]; then
-    persist_env "ANDROID_HOME" "$DETECTED_ANDROID_HOME"
-  else
-    ok "ANDROID_HOME already set: $ANDROID_HOME"
-  fi
+  persist_env "ANDROID_HOME" "$DETECTED_ANDROID_HOME"
 
-  # Ensure platform-tools and cmdline-tools are on PATH
   persist_path_entry "$DETECTED_ANDROID_HOME/platform-tools"
   [[ -d "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin" ]] && \
     persist_path_entry "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin"
 
-  # Verify it works
-  info "Verifying ANDROID_HOME..."
   if [[ -d "$ANDROID_HOME" ]]; then
     ok "ANDROID_HOME verified: $ANDROID_HOME"
   else
     fail "ANDROID_HOME verification failed. Directory not found: $ANDROID_HOME"
   fi
+else
+  fail "ANDROID_HOME could not be set. Install Android SDK manually."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -617,6 +622,51 @@ else
       fail "Could not install Android SDK. Install Android Studio manually from https://developer.android.com/studio"
     fi
   fi
+fi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# 4b. Connected devices check
+# ═══════════════════════════════════════════════════════════════════════════════
+echo ""
+info "Checking for connected Android devices..."
+
+ADB_CMD=""
+if command -v adb &>/dev/null; then
+  ADB_CMD="adb"
+elif [[ -x "${DETECTED_ANDROID_HOME:-}/platform-tools/adb" ]]; then
+  ADB_CMD="${DETECTED_ANDROID_HOME}/platform-tools/adb"
+fi
+
+if [[ -n "$ADB_CMD" ]]; then
+  DEVICES_OUTPUT="$($ADB_CMD devices 2>&1)"
+  CONNECTED=$(echo "$DEVICES_OUTPUT" | grep -cE '^[^\s]+\s+(device|unauthorized|offline)$' || true)
+  UNAUTHORIZED=$(echo "$DEVICES_OUTPUT" | grep -c 'unauthorized' || true)
+
+  if [[ "$CONNECTED" -eq 0 ]]; then
+    warn "No Android devices detected."
+    info "  To install on a physical device:"
+    info "    1. Enable Developer Options: Settings > About Phone > tap 'Build Number' 7 times"
+    info "    2. Enable USB Debugging: Settings > Developer Options > USB Debugging"
+    info "    3. Connect phone via USB cable"
+    info "    4. When prompted on phone, tap 'Allow USB Debugging'"
+    info "    5. Run this setup script again or run: adb devices"
+  elif [[ "$UNAUTHORIZED" -gt 0 ]]; then
+    warn "Device connected but not authorized."
+    info "  Check your phone - tap 'Allow USB Debugging' on the popup."
+    info "  If no popup appears, try: adb kill-server && adb devices"
+  else
+    while IFS= read -r line; do
+      DEV_ID=$(echo "$line" | awk '{print $1}')
+      MODEL=$($ADB_CMD -s "$DEV_ID" shell getprop ro.product.model 2>/dev/null || true)
+      if [[ -n "$MODEL" ]]; then
+        ok "Device connected: $MODEL ($DEV_ID)"
+      else
+        ok "Device connected: $DEV_ID"
+      fi
+    done <<< "$(echo "$DEVICES_OUTPUT" | grep -E '^[^\s]+\s+device$')"
+  fi
+else
+  warn "adb not available - cannot check for connected devices."
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════
