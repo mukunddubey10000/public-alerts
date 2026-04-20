@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useRef, useEffect, useMemo } from "react";
 import {
 	View,
 	Text,
@@ -6,61 +6,249 @@ import {
 	Dimensions,
 	TouchableOpacity,
 	ScrollView,
-	Image,
 } from "react-native";
+import { WebView } from "react-native-webview";
 import { Location, Incident } from "../types";
 import { getDistanceKm } from "../utils/geo";
 
 interface MapViewProps {
 	userLocation: Location;
 	incidents: Incident[];
+	radiusKm?: number;
 	onIncidentPress: (incident: Incident) => void;
 	onMarkerPress: (incident: Incident) => void;
 }
 
+const { height } = Dimensions.get("window");
+const MAP_HEIGHT = height * 0.45;
+
+const getIncidentEmoji = (type: Incident["type"]): string => {
+	switch (type) {
+		case "ACCIDENT":
+			return "🚗";
+		case "OUTAGE":
+			return "⚡";
+		case "CONSTRUCTION":
+			return "🏗️";
+		case "HAZARD":
+			return "⚠️";
+		default:
+			return "📍";
+	}
+};
+
+const getIncidentColor = (type: Incident["type"]): string => {
+	switch (type) {
+		case "ACCIDENT":
+			return "#FF5252";
+		case "OUTAGE":
+			return "#FFC107";
+		case "CONSTRUCTION":
+			return "#FF9800";
+		case "HAZARD":
+			return "#FF6D00";
+		default:
+			return "#2196F3";
+	}
+};
+
 /**
- * Simplified map view (mock)
- * In production, use react-native-maps with MapView component
+ * Generates the Leaflet HTML for the map using OpenStreetMap tiles (free, no API key)
  */
-const MapView: React.FC<MapViewProps> = ({
+const generateMapHTML = (
+	userLocation: Location,
+	incidents: Incident[],
+	radiusKm: number,
+): string => {
+	const markersJS = incidents
+		.map((incident) => {
+			const emoji = getIncidentEmoji(incident.type);
+			const color = getIncidentColor(incident.type);
+			const escapedDesc = incident.description
+				.replace(/'/g, "\\'")
+				.replace(/"/g, "&quot;")
+				.replace(/\n/g, " ");
+			return `
+        (function() {
+          var icon = L.divIcon({
+            className: 'custom-marker',
+            html: '<div style="background:${color};width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;border:2px solid #fff;box-shadow:0 2px 6px rgba(0,0,0,0.3);font-size:16px;">${emoji}</div>',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16],
+            popupAnchor: [0, -16]
+          });
+          var m = L.marker([${incident.location.lat}, ${incident.location.lng}], {icon: icon}).addTo(map);
+          m.bindPopup('<div style="min-width:180px"><b>${emoji} ${incident.type}</b><br/><span style="color:#555;font-size:12px">${escapedDesc}</span><br/><span style="color:#1976D2;font-size:11px;font-weight:600">${getDistanceKm(userLocation, incident.location).toFixed(1)} km away</span> · <span style="font-size:11px">👍 ${incident.upvotes}</span><br/><a href="#" onclick="window.ReactNativeWebView.postMessage(JSON.stringify({type:\\'marker\\',id:\\'${incident.id}\\'}));return false;" style="color:#2196F3;font-size:11px">View details →</a></div>');
+        })();`;
+		})
+		.join("\n");
+
+	return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { margin: 0; padding: 0; }
+    #map { width: 100%; height: 100vh; }
+    .custom-marker { background: none !important; border: none !important; }
+    .user-pulse {
+      width: 20px; height: 20px; border-radius: 50%;
+      background: rgba(33,150,243,0.4);
+      border: 3px solid #2196F3;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 rgba(33,150,243,0.4); }
+      70% { box-shadow: 0 0 0 15px rgba(33,150,243,0); }
+      100% { box-shadow: 0 0 0 0 rgba(33,150,243,0); }
+    }
+    .leaflet-control-attribution { font-size: 9px !important; }
+  </style>
+</head>
+<body>
+  <div id="map"></div>
+  <script>
+    var map = L.map('map', {
+      center: [${userLocation.lat}, ${userLocation.lng}],
+      zoom: 13,
+      zoomControl: true,
+      attributionControl: true
+    });
+
+    // OpenStreetMap tiles - completely free, no API key needed
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // User location marker with pulse effect
+    var userIcon = L.divIcon({
+      className: 'custom-marker',
+      html: '<div class="user-pulse"></div>',
+      iconSize: [20, 20],
+      iconAnchor: [10, 10]
+    });
+    var userMarker = L.marker([${userLocation.lat}, ${userLocation.lng}], {icon: userIcon}).addTo(map);
+    userMarker.bindPopup('<b>📍 You are here</b>');
+
+    // Radius circle
+    L.circle([${userLocation.lat}, ${userLocation.lng}], {
+      radius: ${radiusKm * 1000},
+      color: 'rgba(33, 150, 243, 0.3)',
+      fillColor: 'rgba(33, 150, 243, 0.07)',
+      fillOpacity: 0.7,
+      weight: 1.5
+    }).addTo(map);
+
+    // Incident markers
+    ${markersJS}
+
+    // Listen for recenter command from React Native
+    window.addEventListener('message', function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data.type === 'recenter') {
+          map.flyTo([data.lat, data.lng], 13, { duration: 0.5 });
+        }
+        if (data.type === 'updateLocation') {
+          userMarker.setLatLng([data.lat, data.lng]);
+          map.flyTo([data.lat, data.lng], map.getZoom(), { duration: 0.5 });
+        }
+      } catch(e) {}
+    });
+    document.addEventListener('message', function(event) {
+      try {
+        var data = JSON.parse(event.data);
+        if (data.type === 'recenter') {
+          map.flyTo([data.lat, data.lng], 13, { duration: 0.5 });
+        }
+        if (data.type === 'updateLocation') {
+          userMarker.setLatLng([data.lat, data.lng]);
+          map.flyTo([data.lat, data.lng], map.getZoom(), { duration: 0.5 });
+        }
+      } catch(e) {}
+    });
+  </script>
+</body>
+</html>`;
+};
+
+const MapViewComponent: React.FC<MapViewProps> = ({
 	userLocation,
 	incidents,
+	radiusKm = 5,
 	onIncidentPress,
 	onMarkerPress,
 }) => {
+	const webViewRef = useRef<WebView>(null);
+
+	const mapHTML = useMemo(
+		() => generateMapHTML(userLocation, incidents, radiusKm),
+		[userLocation, incidents, radiusKm],
+	);
+
+	const handleRecenter = () => {
+		webViewRef.current?.postMessage(
+			JSON.stringify({
+				type: "recenter",
+				lat: userLocation.lat,
+				lng: userLocation.lng,
+			}),
+		);
+	};
+
+	const handleWebViewMessage = (event: { nativeEvent: { data: string } }) => {
+		try {
+			const data = JSON.parse(event.nativeEvent.data);
+			if (data.type === "marker") {
+				const incident = incidents.find((i) => i.id === data.id);
+				if (incident) {
+					onIncidentPress(incident);
+				}
+			}
+		} catch (e) {
+			// Ignore parse errors
+		}
+	};
+
 	return (
 		<View style={styles.container}>
-			{/* Map placeholder */}
-			<View style={styles.mapPlaceholder}>
-				<Text style={styles.mapPlaceholderText}>
-					📍 Map View (Bangalore, India)
-				</Text>
-				<Text style={styles.coordsText}>
-					{`Your Location: ${userLocation.lat.toFixed(4)}, ${userLocation.lng.toFixed(4)}`}
-				</Text>
+			{/* Leaflet Map via WebView */}
+			<View style={styles.mapContainer}>
+				<WebView
+					ref={webViewRef}
+					source={{ html: mapHTML }}
+					style={styles.map}
+					javaScriptEnabled={true}
+					domStorageEnabled={true}
+					onMessage={handleWebViewMessage}
+					scrollEnabled={false}
+					bounces={false}
+					overScrollMode="never"
+					showsHorizontalScrollIndicator={false}
+					showsVerticalScrollIndicator={false}
+					startInLoadingState={true}
+					renderLoading={() => (
+						<View style={styles.mapLoading}>
+							<Text style={styles.mapLoadingText}>🗺️ Loading map...</Text>
+						</View>
+					)}
+				/>
 
-				{/* Incident markers (simplified list below map) */}
-				<ScrollView style={styles.markersContainer} horizontal>
-					{incidents.map((incident) => (
-						<TouchableOpacity
-							key={incident.id}
-							style={[
-								styles.marker,
-								{
-									backgroundColor: getIncidentColor(incident.type),
-								},
-							]}
-							onPress={() => onMarkerPress(incident)}
-						>
-							<Text style={styles.markerText}>
-								{getIncidentEmoji(incident.type)}
-							</Text>
-							<Text style={styles.markerDistance}>
-								{getDistanceKm(userLocation, incident.location).toFixed(1)} km
-							</Text>
-						</TouchableOpacity>
-					))}
-				</ScrollView>
+				{/* Re-center button */}
+				<TouchableOpacity style={styles.recenterButton} onPress={handleRecenter}>
+					<Text style={styles.recenterIcon}>📍</Text>
+				</TouchableOpacity>
+
+				{/* Incident count overlay */}
+				<View style={styles.incidentCountBadge}>
+					<Text style={styles.incidentCountText}>
+						{incidents.length} incident{incidents.length !== 1 ? "s" : ""} nearby
+					</Text>
+				</View>
 			</View>
 
 			{/* Incidents list below map */}
@@ -146,37 +334,6 @@ const IncidentCard: React.FC<IncidentCardProps> = ({
 	);
 };
 
-// Helpers
-const getIncidentEmoji = (type: Incident["type"]): string => {
-	switch (type) {
-		case "ACCIDENT":
-			return "🚗";
-		case "OUTAGE":
-			return "⚡";
-		case "CONSTRUCTION":
-			return "🏗️";
-		case "HAZARD":
-			return "⚠️";
-		default:
-			return "📍";
-	}
-};
-
-const getIncidentColor = (type: Incident["type"]): string => {
-	switch (type) {
-		case "ACCIDENT":
-			return "#FF5252";
-		case "OUTAGE":
-			return "#FFC107";
-		case "CONSTRUCTION":
-			return "#FF9800";
-		case "HAZARD":
-			return "#FF6D00";
-		default:
-			return "#2196F3";
-	}
-};
-
 const getTimeAgo = (timestamp: number): string => {
 	const now = Date.now();
 	const diff = now - timestamp;
@@ -195,51 +352,55 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: "#f5f5f5",
 	},
-	mapPlaceholder: {
-		height: "40%",
+	mapContainer: {
+		height: MAP_HEIGHT,
+		position: "relative",
+	},
+	map: {
+		flex: 1,
+	},
+	mapLoading: {
+		...StyleSheet.absoluteFillObject,
 		backgroundColor: "#E3F2FD",
-		padding: 15,
 		justifyContent: "center",
 		alignItems: "center",
-		borderBottomWidth: 2,
-		borderBottomColor: "#2196F3",
 	},
-	mapPlaceholderText: {
-		fontSize: 18,
-		fontWeight: "bold",
+	mapLoadingText: {
+		fontSize: 16,
 		color: "#1976D2",
-		marginBottom: 10,
 	},
-	coordsText: {
-		fontSize: 12,
-		color: "#555",
-		marginBottom: 15,
-	},
-	markersContainer: {
-		maxHeight: 80,
-		marginVertical: 10,
-	},
-	marker: {
-		width: 70,
-		height: 70,
-		borderRadius: 35,
+	recenterButton: {
+		position: "absolute",
+		bottom: 15,
+		left: 15,
+		width: 44,
+		height: 44,
+		borderRadius: 22,
+		backgroundColor: "#fff",
 		justifyContent: "center",
 		alignItems: "center",
-		marginHorizontal: 5,
 		shadowColor: "#000",
 		shadowOffset: { width: 0, height: 2 },
 		shadowOpacity: 0.25,
 		shadowRadius: 3.84,
 		elevation: 5,
 	},
-	markerText: {
-		fontSize: 28,
+	recenterIcon: {
+		fontSize: 22,
 	},
-	markerDistance: {
-		fontSize: 10,
+	incidentCountBadge: {
+		position: "absolute",
+		top: 15,
+		left: 15,
+		backgroundColor: "rgba(0, 0, 0, 0.7)",
+		paddingHorizontal: 12,
+		paddingVertical: 6,
+		borderRadius: 20,
+	},
+	incidentCountText: {
 		color: "#fff",
-		fontWeight: "bold",
-		marginTop: 3,
+		fontSize: 12,
+		fontWeight: "600",
 	},
 	listContainer: {
 		flex: 1,
@@ -342,4 +503,4 @@ const styles = StyleSheet.create({
 	},
 });
 
-export default MapView;
+export default MapViewComponent;

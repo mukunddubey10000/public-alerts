@@ -25,7 +25,7 @@ import {
 } from "../services/mockData";
 
 const HomeScreen = () => {
-	const { location, isLoading: locationLoading } = useLocation();
+	const { location, isLoading: locationLoading, error: locationError } = useLocation();
 	const { notifications, unreadCount, markAsRead } = useNotifications();
 
 	const [reportModalVisible, setReportModalVisible] = useState(false);
@@ -131,15 +131,29 @@ const HomeScreen = () => {
 			{/* Main Map View */}
 			{locationLoading ? (
 				<View style={styles.loadingContainer}>
-					<Text style={styles.loadingText}>📍 Fetching your location...</Text>
+					<Text style={styles.loadingEmoji}>📍</Text>
+					<Text style={styles.loadingText}>Fetching your location...</Text>
+					<Text style={styles.loadingSubtext}>
+						Please allow location access when prompted
+					</Text>
 				</View>
 			) : (
-				<MapView
-					userLocation={location}
-					incidents={incidents}
-					onIncidentPress={handleIncidentPress}
-					onMarkerPress={handleIncidentPress}
-				/>
+				<View style={{ flex: 1 }}>
+					{locationError && (
+						<View style={styles.locationErrorBanner}>
+							<Text style={styles.locationErrorText}>
+								⚠️ Using approximate location: {locationError}
+							</Text>
+						</View>
+					)}
+					<MapView
+						userLocation={location}
+						incidents={incidents}
+						radiusKm={filters.radiusKm}
+						onIncidentPress={handleIncidentPress}
+						onMarkerPress={handleIncidentPress}
+					/>
+				</View>
 			)}
 
 			{/* Floating Action Buttons */}
@@ -418,9 +432,31 @@ const styles = StyleSheet.create({
 		alignItems: "center",
 		backgroundColor: "#f5f5f5",
 	},
+	loadingEmoji: {
+		fontSize: 40,
+		marginBottom: 12,
+	},
 	loadingText: {
-		fontSize: 14,
-		color: "#666",
+		fontSize: 16,
+		color: "#333",
+		fontWeight: "600",
+	},
+	loadingSubtext: {
+		fontSize: 12,
+		color: "#999",
+		marginTop: 6,
+	},
+	locationErrorBanner: {
+		backgroundColor: "#FFF3E0",
+		paddingVertical: 6,
+		paddingHorizontal: 15,
+		borderBottomWidth: 1,
+		borderBottomColor: "#FFE0B2",
+	},
+	locationErrorText: {
+		fontSize: 11,
+		color: "#E65100",
+		textAlign: "center",
 	},
 	fab: {
 		position: "absolute",

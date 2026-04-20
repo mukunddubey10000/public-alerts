@@ -1,4 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
+import Geolocation from 'react-native-geolocation-service';
 import { Location, Incident, Notification } from '../types';
 import {
   getCurrentUser,
@@ -11,23 +13,137 @@ import {
 } from '../services/mockData';
 
 /**
- * Hook to manage user location (GPS + manual override)
+ * Request location permission on Android
+ */
+const requestAndroidPermission = async (): Promise<boolean> => {
+  try {
+    const fineGranted = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+      {
+        title: 'CivicAlerts Location Permission',
+        message:
+          'CivicAlerts needs access to your location to show nearby incidents and alerts.',
+        buttonNeutral: 'Ask Me Later',
+        buttonNegative: 'Cancel',
+        buttonPositive: 'OK',
+      },
+    );
+    return fineGranted === PermissionsAndroid.RESULTS.GRANTED;
+  } catch (err) {
+    console.warn('Location permission error:', err);
+    return false;
+  }
+};
+
+/**
+ * Request location permission (cross-platform)
+ */
+const requestLocationPermission = async (): Promise<boolean> => {
+  if (Platform.OS === 'android') {
+    return requestAndroidPermission();
+  }
+  // iOS: permissions handled via Info.plist, Geolocation triggers the prompt
+  return true;
+};
+
+/**
+ * Hook to manage user location with real GPS tracking
  */
 export const useLocation = () => {
   const [location, setLocation] = useState<Location>(DEFAULT_USER_LOCATION);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const watchIdRef = useRef<number | null>(null);
 
-  // Simulate GPS polling (in real app, use react-native-geolocation-service)
   useEffect(() => {
-    setIsLoading(true);
-    // Mock: simulate fetching location
-    const timer = setTimeout(() => {
-      setLocation(DEFAULT_USER_LOCATION);
-      updateUserLocation(DEFAULT_USER_LOCATION);
-      setIsLoading(false);
-    }, 500);
-    return () => clearTimeout(timer);
+    let mounted = true;
+
+    const startLocationTracking = async () => {
+      const hasPermission = await requestLocationPermission();
+
+      if (!hasPermission) {
+        if (mounted) {
+          setError('Location permission denied');
+          setIsLoading(false);
+          Alert.alert(
+            'Location Required',
+            'CivicAlerts needs your location to show nearby incidents. Please enable location access in Settings.',
+            [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+            ],
+          );
+        }
+        return;
+      }
+
+      // Get current position first (one-shot)
+      Geolocation.getCurrentPosition(
+        (position) => {
+          if (mounted) {
+            const newLoc: Location = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            setLocation(newLoc);
+            updateUserLocation(newLoc);
+            setIsLoading(false);
+            setError(null);
+          }
+        },
+        (err) => {
+          console.warn('getCurrentPosition error:', err);
+          if (mounted) {
+            // Fall back to default location
+            setLocation(DEFAULT_USER_LOCATION);
+            updateUserLocation(DEFAULT_USER_LOCATION);
+            setError(err.message);
+            setIsLoading(false);
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 10000,
+        },
+      );
+
+      // Watch position for continuous updates
+      watchIdRef.current = Geolocation.watchPosition(
+        (position) => {
+          if (mounted) {
+            const newLoc: Location = {
+              lat: position.coords.latitude,
+              lng: position.coords.longitude,
+            };
+            setLocation(newLoc);
+            updateUserLocation(newLoc);
+            setError(null);
+          }
+        },
+        (err) => {
+          console.warn('watchPosition error:', err);
+          if (mounted) {
+            setError(err.message);
+          }
+        },
+        {
+          enableHighAccuracy: true,
+          distanceFilter: 50, // Update every 50 meters
+          interval: 10000, // Android: check every 10s
+          fastestInterval: 5000,
+        },
+      );
+    };
+
+    startLocationTracking();
+
+    return () => {
+      mounted = false;
+      if (watchIdRef.current !== null) {
+        Geolocation.clearWatch(watchIdRef.current);
+      }
+    };
   }, []);
 
   const updateLocation = useCallback((newLocation: Location) => {
