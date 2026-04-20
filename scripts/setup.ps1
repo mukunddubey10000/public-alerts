@@ -219,18 +219,23 @@ function Find-JavaHome {
 
     # 2) Scan known directories across all drives (C: first)
     $jdkCandidates = @()
+    $jdkVersions = @(8, 11, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26)
     foreach ($d in $drives) {
         # Microsoft OpenJDK (all common versions)
-        foreach ($ver in @(17, 21, 22, 23, 24, 25, 26)) {
+        foreach ($ver in $jdkVersions) {
             $jdkCandidates += "${d}:\Program Files\Microsoft\jdk-${ver}*"
         }
+        $jdkCandidates += "${d}:\Program Files\Microsoft\jdk-*"
         # Oracle / Temurin / Zulu / Corretto (all versions)
         $jdkCandidates += "${d}:\Program Files\Java\jdk*"
-        foreach ($ver in @(17, 21, 22, 23, 24, 25, 26)) {
+        foreach ($ver in $jdkVersions) {
             $jdkCandidates += "${d}:\Program Files\Eclipse Adoptium\jdk-${ver}*"
             $jdkCandidates += "${d}:\Program Files\Zulu\zulu-${ver}*"
             $jdkCandidates += "${d}:\Program Files\Amazon Corretto\jdk${ver}*"
         }
+        $jdkCandidates += "${d}:\Program Files\Eclipse Adoptium\jdk-*"
+        $jdkCandidates += "${d}:\Program Files\Zulu\zulu-*"
+        $jdkCandidates += "${d}:\Program Files\Amazon Corretto\jdk*"
         # x86 variants
         $jdkCandidates += "${d}:\Program Files (x86)\Java\jdk*"
         # Android Studio bundled JDK
@@ -278,7 +283,10 @@ if ($detectedJavaHome) {
     if ($detectedJavaHome) {
         Write-Ok "JDK 17 installed at $detectedJavaHome"
     } else {
-        Write-Fail "JDK installed but could not auto-detect path. You may need to set JAVA_HOME manually."
+    Write-Fail "JDK installed but could not auto-detect path."
+    Write-Fail "Please install JDK 17 manually from https://adoptium.net/ and then either:"
+    Write-Fail "  1. Set JAVA_HOME in System Environment Variables to your JDK folder, OR"
+    Write-Fail "  2. Re-run this setup script after installing"
     }
 }
 
@@ -287,11 +295,17 @@ if ($detectedJavaHome) {
     Set-PersistentEnv "JAVA_HOME" $detectedJavaHome
     Add-PersistentPath "$detectedJavaHome\bin"
     # Verify it works
-    $verifyVer = & "$env:JAVA_HOME\bin\javac.exe" -version 2>&1
-    Write-Ok "JAVA_HOME verified: $env:JAVA_HOME ($verifyVer)"
+    try {
+        $verifyVer = & "$env:JAVA_HOME\bin\javac.exe" -version 2>&1
+        Write-Ok "JAVA_HOME verified: $env:JAVA_HOME ($verifyVer)"
+    } catch {
+        Write-Fail "JAVA_HOME set to $env:JAVA_HOME but javac verification failed."
+        Write-Fail "Try opening a NEW terminal and running: javac -version"
+    }
 } else {
-    Write-Fail "JAVA_HOME could not be set. Install JDK 17 manually and set JAVA_HOME."
-}
+    Write-Fail "JAVA_HOME could not be set."
+    Write-Fail "Install JDK 17 from https://adoptium.net/ then set JAVA_HOME manually."
+    Write-Fail "After installing, re-run: npm run setup"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. Android SDK — scan all drives, install if missing, set ANDROID_HOME

@@ -327,6 +327,7 @@ detect_java_home() {
     if [[ -n "$brew_prefix" ]]; then
       candidates+=(
         "$brew_prefix/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+        "$brew_prefix/opt/openjdk@11/libexec/openjdk.jdk/Contents/Home"
         "$brew_prefix/opt/openjdk/libexec/openjdk.jdk/Contents/Home"
       )
     fi
@@ -335,9 +336,13 @@ detect_java_home() {
       "/usr/lib/jvm/java-17-openjdk-amd64"
       "/usr/lib/jvm/java-17-openjdk-arm64"
       "/usr/lib/jvm/java-17-openjdk"
-      "/usr/lib/jvm/java-17-openjdk"         # Arch/Fedora
+      "/usr/lib/jvm/java-11-openjdk-amd64"
+      "/usr/lib/jvm/java-11-openjdk-arm64"
+      "/usr/lib/jvm/java-11-openjdk"
       "/usr/lib/jvm/temurin-17-jdk-amd64"
+      "/usr/lib/jvm/temurin-11-jdk-amd64"
       "/usr/lib/jvm/"*"-17"*
+      "/usr/lib/jvm/"*"-11"*
       "/usr/lib/jvm/default-java"             # Debian/Ubuntu alternative
       "/usr/lib/jvm/default"                  # Arch
       "/usr/lib/jvm/"*
