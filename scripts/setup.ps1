@@ -340,30 +340,44 @@ function Install-AndroidSdk {
         $buffer = New-Object byte[] 65536
         $downloaded = 0
         $lastPct = -1
+        $lastReportTime = [System.Diagnostics.Stopwatch]::StartNew()
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
         try {
             while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
                 $fileStream.Write($buffer, 0, $bytesRead)
                 $downloaded += $bytesRead
+                # Report every 2 seconds or on percentage change
+                $shouldReport = ($lastReportTime.Elapsed.TotalSeconds -ge 2)
                 if ($totalBytes -and $totalBytes -gt 0) {
                     $pct = [math]::Floor(($downloaded / $totalBytes) * 100)
-                    if ($pct -ne $lastPct) {
-                        $mbDown = [math]::Round($downloaded / 1MB, 1)
-                        $mbTotal = [math]::Round($totalBytes / 1MB, 1)
-                        $elapsed = $sw.Elapsed.TotalSeconds
-                        if ($elapsed -gt 0) {
-                            $speed = [math]::Round(($downloaded / 1MB) / $elapsed, 1)
-                        } else {
-                            $speed = 0
-                        }
-                        $statusMsg = '{0} MB / {1} MB  ({2} MB/s)' -f $mbDown, $mbTotal, $speed
-                        Write-Progress -Activity 'Downloading Android SDK' -Status $statusMsg -PercentComplete $pct
-                        $lastPct = $pct
+                    if ($pct -ne $lastPct) { $shouldReport = $true }
+                } else {
+                    $pct = -1
+                }
+                if ($shouldReport) {
+                    $mbDown = [math]::Round($downloaded / 1MB, 1)
+                    $elapsed = $sw.Elapsed.TotalSeconds
+                    if ($elapsed -gt 0) {
+                        $speed = [math]::Round(($downloaded / 1MB) / $elapsed, 1)
+                    } else {
+                        $speed = 0
                     }
+                    if ($totalBytes -and $totalBytes -gt 0) {
+                        $mbTotal = [math]::Round($totalBytes / 1MB, 1)
+                        $remaining = if ($speed -gt 0) { [math]::Round(($totalBytes - $downloaded) / 1MB / $speed, 0) } else { 0 }
+                        $eta = if ($speed -gt 0) { "${remaining}s left" } else { "calculating..." }
+                        Write-Host ("`r  [DOWNLOAD] {0}% - {1} / {2} MB  ({3} MB/s, {4})    " -f $pct, $mbDown, $mbTotal, $speed, $eta) -NoNewline -ForegroundColor Cyan
+                    } else {
+                        Write-Host ("`r  [DOWNLOAD] {0} MB downloaded  ({1} MB/s)    " -f $mbDown, $speed) -NoNewline -ForegroundColor Cyan
+                    }
+                    $lastPct = $pct
+                    $lastReportTime.Restart()
                 }
             }
+            Write-Host ""  # newline after progress
         } catch {
+            Write-Host ""  # newline after progress
             throw
         } finally {
             $fileStream.Close()
@@ -371,7 +385,6 @@ function Install-AndroidSdk {
         }
         $httpClient.Dispose()
         $sw.Stop()
-        Write-Progress -Activity "Downloading Android SDK" -Completed
         $dlSecs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
         $dlMB = [math]::Round($downloaded / 1MB, 1)
         Write-Ok ('Download complete ({0} MB in {1}s)' -f $dlMB, $dlSecs)
