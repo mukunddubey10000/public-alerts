@@ -1,0 +1,27 @@
+buildscript {
+    ext {
+        buildToolsVersion = "30.0.3"
+        minSdkVersion = 21
+        compileSdkVersion = 31
+        targetSdkVersion = 31
+        ndkVersion = "21.4.7075529"
+    }
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+    classpath("com.android.tools.build:gradle:7.4.2")
+    }
+}
+
+allprojects {
+    repositories {
+        mavenLocal()
+        maven {
+            url("$rootDir/../node_modules/react-native/android")
+        }
+        google()
+        mavenCentral()
+    }
+}
