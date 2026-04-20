@@ -330,9 +330,10 @@ function Install-AndroidSdk {
 
         $totalBytes = $response.Content.Headers.ContentLength
         if ($totalBytes -and $totalBytes -gt 0) {
-            Write-Info "  [1/2] File size: $([math]::Round($totalBytes / 1MB, 1)) MB"
+            $totalMB = [math]::Round($totalBytes / 1MB, 1)
+            Write-Info "  [1/2] File size: $totalMB MB"
         } else {
-            Write-Warn "  [1/2] Server did not report file size — progress bar will be unavailable"
+            Write-Warn "  [1/2] Server did not report file size - progress bar will be unavailable"
         }
         $stream = $response.Content.ReadAsStreamAsync().Result
         $fileStream = [System.IO.File]::Create($tmpZip)
@@ -356,16 +357,14 @@ function Install-AndroidSdk {
                         } else {
                             $speed = 0
                         }
-                        $progressParams = @{
-                            Activity        = 'Downloading Android SDK'
-                            Status          = "${mbDown} MB / ${mbTotal} MB  (${speed} MB/s)"
-                            PercentComplete = $pct
-                        }
-                        Write-Progress @progressParams
+                        $statusMsg = '{0} MB / {1} MB  ({2} MB/s)' -f $mbDown, $mbTotal, $speed
+                        Write-Progress -Activity 'Downloading Android SDK' -Status $statusMsg -PercentComplete $pct
                         $lastPct = $pct
                     }
                 }
             }
+        } catch {
+            throw
         } finally {
             $fileStream.Close()
             $stream.Close()
@@ -374,7 +373,8 @@ function Install-AndroidSdk {
         $sw.Stop()
         Write-Progress -Activity "Downloading Android SDK" -Completed
         $dlSecs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
-        Write-Ok "Download complete ($([math]::Round($downloaded / 1MB, 1)) MB in ${dlSecs}s)"
+        $dlMB = [math]::Round($downloaded / 1MB, 1)
+        Write-Ok ('Download complete ({0} MB in {1}s)' -f $dlMB, $dlSecs)
         $downloadOk = $true
     } catch {
         Write-Warn "HttpClient failed: $($_.Exception.Message)"
@@ -412,11 +412,13 @@ function Install-AndroidSdk {
     }
     $zipSize = (Get-Item $tmpZip).Length
     if ($zipSize -lt 1000000) {
-        Write-Fail "Download file too small ($([math]::Round($zipSize / 1KB, 1)) KB) — likely incomplete or corrupted."
+        $zipKB = [math]::Round($zipSize / 1KB, 1)
+        Write-Fail ('Download file too small ({0} KB) - likely incomplete or corrupted.' -f $zipKB)
         Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
         return
     }
-    Write-Info "Downloaded file size: $([math]::Round($zipSize / 1MB, 1)) MB — looks valid"
+    $zipMB = [math]::Round($zipSize / 1MB, 1)
+    Write-Info "Downloaded file size: $zipMB MB - looks valid"
 
     Write-Info "Extracting to $sdkDir..."
     try {
@@ -436,7 +438,7 @@ function Install-AndroidSdk {
     Write-Ok "Extraction complete"
 
     if (-not (Test-Path "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat")) {
-        Write-Fail "sdkmanager not found after extraction — zip may be corrupted"
+        Write-Fail "sdkmanager not found after extraction - zip may be corrupted"
         return
     }
 
