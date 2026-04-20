@@ -1,19 +1,11 @@
 apply plugin: "com.android.application"
-
-import com.android.build.OutputFile
-
-project.ext.react = [
-    enableHermes: false,
-]
-
-apply from: "../../node_modules/react-native/react.gradle"
+apply plugin: "com.facebook.react"
 
 def enableSeparateBuildPerCPUArchitecture = false
 
 def enableProguardInReleaseBuilds = false
 
 def jscFlavor = 'org.webkit:android-jsc:+'
-def enableHermes = project.ext.react.get("enableHermes", false)
 
 android {
     namespace "com.civicalerts"
@@ -72,14 +64,13 @@ android {
 }
 
 dependencies {
-    implementation fileTree(dir: "libs", include: ["*.jar"])
-    implementation "com.facebook.react:react-native:+"
+    implementation("com.facebook.react:react-native:+")
 
-    if (enableHermes) {
-        def hermesPath = "../../node_modules/hermes-engine/android/"
-        debugImplementation files(hermesPath + "hermes-debug.aar")
-        releaseImplementation files(hermesPath + "hermes-release.aar")
+    if (hermesEnabled.toBoolean()) {
+        implementation("com.facebook.react:hermes-engine")
     } else {
         implementation jscFlavor
     }
 }
+
+apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
