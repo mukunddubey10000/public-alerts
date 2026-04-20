@@ -74,6 +74,12 @@ persist_env() {
   local var_name="$1"
   local var_value="$2"
 
+  # Validate path exists before persisting
+  if [[ ! -d "$var_value" ]]; then
+    warn "Cannot set $var_name - path does not exist: $var_value"
+    return 1
+  fi
+
   # Export in current session
   export "$var_name"="$var_value"
 
@@ -99,6 +105,12 @@ persist_env() {
 # ─── Persist a PATH entry to shell profile ────────────────────────────────────
 persist_path_entry() {
   local entry="$1"
+
+  # Validate directory exists before persisting
+  if [[ ! -d "$entry" ]]; then
+    warn "Cannot add to PATH - directory does not exist: $entry"
+    return 1
+  fi
 
   # Add to current session
   export PATH="$entry:$PATH"
@@ -366,12 +378,33 @@ else
   ok "JDK 17 installed at $DETECTED_JAVA_HOME"
 fi
 
-# Set JAVA_HOME persistently
+# Validate existing JAVA_HOME - clear it if it points to a bad path
+if [[ -n "${JAVA_HOME:-}" && ! -x "$JAVA_HOME/bin/javac" ]]; then
+  warn "Existing JAVA_HOME is invalid: $JAVA_HOME"
+  info "Clearing stale JAVA_HOME from $SHELL_PROFILE..."
+  if [[ "$PLATFORM" == "mac" ]]; then
+    sed -i '' '/^export JAVA_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  else
+    sed -i '/^export JAVA_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  fi
+  unset JAVA_HOME
+  ENV_CHANGED=true
+fi
+
+# Set JAVA_HOME persistently right after install
 if [[ -n "$DETECTED_JAVA_HOME" ]]; then
   if [[ "${JAVA_HOME:-}" != "$DETECTED_JAVA_HOME" ]]; then
     persist_env "JAVA_HOME" "$DETECTED_JAVA_HOME"
   else
     ok "JAVA_HOME already set: $JAVA_HOME"
+  fi
+  # Verify it works
+  info "Verifying JAVA_HOME..."
+  if [[ -x "$JAVA_HOME/bin/javac" ]]; then
+    VERIFY_VER="$("$JAVA_HOME/bin/javac" -version 2>&1)"
+    ok "JAVA_HOME verified: $JAVA_HOME ($VERIFY_VER)"
+  else
+    fail "JAVA_HOME verification failed. javac not found at $JAVA_HOME/bin/javac"
   fi
 fi
 
@@ -522,7 +555,20 @@ else
   install_android_sdk
 fi
 
-# Set ANDROID_HOME persistently
+# Validate existing ANDROID_HOME - clear it if it points to a bad path
+if [[ -n "${ANDROID_HOME:-}" && ! -d "$ANDROID_HOME" ]]; then
+  warn "Existing ANDROID_HOME is invalid: $ANDROID_HOME"
+  info "Clearing stale ANDROID_HOME from $SHELL_PROFILE..."
+  if [[ "$PLATFORM" == "mac" ]]; then
+    sed -i '' '/^export ANDROID_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  else
+    sed -i '/^export ANDROID_HOME=/d' "$SHELL_PROFILE" 2>/dev/null || true
+  fi
+  unset ANDROID_HOME
+  ENV_CHANGED=true
+fi
+
+# Set ANDROID_HOME persistently right after install
 if [[ -n "$DETECTED_ANDROID_HOME" ]]; then
   if [[ "${ANDROID_HOME:-}" != "$DETECTED_ANDROID_HOME" ]]; then
     persist_env "ANDROID_HOME" "$DETECTED_ANDROID_HOME"
@@ -534,6 +580,14 @@ if [[ -n "$DETECTED_ANDROID_HOME" ]]; then
   persist_path_entry "$DETECTED_ANDROID_HOME/platform-tools"
   [[ -d "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin" ]] && \
     persist_path_entry "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin"
+
+  # Verify it works
+  info "Verifying ANDROID_HOME..."
+  if [[ -d "$ANDROID_HOME" ]]; then
+    ok "ANDROID_HOME verified: $ANDROID_HOME"
+  else
+    fail "ANDROID_HOME verification failed. Directory not found: $ANDROID_HOME"
+  fi
 fi
 
 # ═══════════════════════════════════════════════════════════════════════════════

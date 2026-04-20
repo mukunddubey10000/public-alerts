@@ -38,16 +38,20 @@ function Refresh-Path {
 }
 
 # ─── Persist an env var to User environment ───────────────────────────────────
-function Set-PersistentEnv ($varName, $varValue) {
-    Set-Item -Path "Env:\$varName" -Value $varValue
+function Set-PersistentEnv ($varName, $varValue) {    if (-not (Test-Path $varValue)) {
+        Write-Warn "Cannot set $varName - path does not exist: $varValue"
+        return
+    }    Set-Item -Path "Env:\$varName" -Value $varValue
     [System.Environment]::SetEnvironmentVariable($varName, $varValue, "User")
     Write-Ok "Set $varName = $varValue (User environment)"
     $script:EnvChanged = $true
 }
 
 # ─── Append to User PATH if not already there ────────────────────────────────
-function Add-PersistentPath ($entry) {
-    $currentUserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
+function Add-PersistentPath ($entry) {    if (-not (Test-Path $entry)) {
+        Write-Warn "Cannot add to PATH - directory does not exist: $entry"
+        return
+    }    $currentUserPath = [System.Environment]::GetEnvironmentVariable("Path", "User")
     if ($currentUserPath -and $currentUserPath.ToLower().Contains($entry.ToLower())) {
         return  # already present
     }
@@ -252,15 +256,31 @@ if ($detectedJavaHome) {
     }
 }
 
-# Set JAVA_HOME persistently
+# Validate existing JAVA_HOME — clear it if it points to a bad path
+if ($env:JAVA_HOME -and -not (Test-Path "$env:JAVA_HOME\bin\javac.exe")) {
+    Write-Warn "Existing JAVA_HOME is invalid: $env:JAVA_HOME"
+    Write-Info "Clearing stale JAVA_HOME..."
+    [System.Environment]::SetEnvironmentVariable("JAVA_HOME", $null, "User")
+    $env:JAVA_HOME = $null
+    $script:EnvChanged = $true
+}
+
+# Set JAVA_HOME persistently right after install
 if ($detectedJavaHome) {
     if ($env:JAVA_HOME -ne $detectedJavaHome) {
         Set-PersistentEnv "JAVA_HOME" $detectedJavaHome
     } else {
         Write-Ok "JAVA_HOME already set: $env:JAVA_HOME"
     }
-    # Ensure bin is on PATH
     Add-PersistentPath "$detectedJavaHome\bin"
+    # Verify it works
+    Write-Info "Verifying JAVA_HOME..."
+    if (Test-Path "$env:JAVA_HOME\bin\javac.exe") {
+        $verifyVer = & "$env:JAVA_HOME\bin\javac.exe" -version 2>&1
+        Write-Ok "JAVA_HOME verified: $env:JAVA_HOME ($verifyVer)"
+    } else {
+        Write-Fail "JAVA_HOME verification failed. javac not found at $env:JAVA_HOME\bin\javac.exe"
+    }
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -444,7 +464,16 @@ if ($detectedAndroidHome) {
     Install-AndroidSdk
 }
 
-# Set ANDROID_HOME persistently
+# Validate existing ANDROID_HOME — clear it if it points to a bad path
+if ($env:ANDROID_HOME -and -not (Test-Path $env:ANDROID_HOME)) {
+    Write-Warn "Existing ANDROID_HOME is invalid: $env:ANDROID_HOME"
+    Write-Info "Clearing stale ANDROID_HOME..."
+    [System.Environment]::SetEnvironmentVariable("ANDROID_HOME", $null, "User")
+    $env:ANDROID_HOME = $null
+    $script:EnvChanged = $true
+}
+
+# Set ANDROID_HOME persistently right after install
 if ($detectedAndroidHome) {
     if ($env:ANDROID_HOME -ne $detectedAndroidHome) {
         Set-PersistentEnv "ANDROID_HOME" $detectedAndroidHome
@@ -452,11 +481,18 @@ if ($detectedAndroidHome) {
         Write-Ok "ANDROID_HOME already set: $env:ANDROID_HOME"
     }
 
-    # Ensure platform-tools & cmdline-tools on PATH
     Add-PersistentPath "$detectedAndroidHome\platform-tools"
     $cmdToolsBin = "$detectedAndroidHome\cmdline-tools\latest\bin"
     if (Test-Path $cmdToolsBin) {
         Add-PersistentPath $cmdToolsBin
+    }
+
+    # Verify it works
+    Write-Info "Verifying ANDROID_HOME..."
+    if (Test-Path $env:ANDROID_HOME) {
+        Write-Ok "ANDROID_HOME verified: $env:ANDROID_HOME"
+    } else {
+        Write-Fail "ANDROID_HOME verification failed. Directory not found: $env:ANDROID_HOME"
     }
 }
 
