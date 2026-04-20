@@ -301,25 +301,41 @@ function Install-AndroidSdk {
     $toolsUrl = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
     $tmpZip = "$env:TEMP\android-cmdline-tools.zip"
 
-    Write-Info "Downloading Android command-line tools (~150 MB, may take a few minutes)..."
+    Write-Info "Downloading Android command-line tools (~150 MB)..."
+    Write-Info "  URL: $toolsUrl"
+    Write-Info "  Destination: $tmpZip"
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
     # Use .NET HttpClient with a streaming progress bar (fast, unlike Invoke-WebRequest)
     $prevPref = $ProgressPreference
     $ProgressPreference = 'SilentlyContinue'
+    $downloadOk = $false
     try {
+        Write-Info "  [1/2] Loading System.Net.Http assembly..."
         Add-Type -AssemblyName System.Net.Http
+        Write-Info "  [1/2] Creating HttpClient (timeout: 10 min)..."
         $httpClient = New-Object System.Net.Http.HttpClient
         $httpClient.Timeout = [TimeSpan]::FromMinutes(10)
+        Write-Info "  [1/2] Connecting to dl.google.com..."
         $response = $httpClient.GetAsync($toolsUrl, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
-        $response.EnsureSuccessStatusCode() | Out-Null
+        $statusCode = [int]$response.StatusCode
+        if ($statusCode -ne 200) {
+            throw "Server returned HTTP $statusCode"
+        }
+        Write-Info "  [1/2] Connected (HTTP $statusCode). Starting download..."
 
         $totalBytes = $response.Content.Headers.ContentLength
+        if ($totalBytes -and $totalBytes -gt 0) {
+            Write-Info "  [1/2] File size: $([math]::Round($totalBytes / 1MB, 1)) MB"
+        } else {
+            Write-Warn "  [1/2] Server did not report file size — progress bar will be unavailable"
+        }
         $stream = $response.Content.ReadAsStreamAsync().Result
         $fileStream = [System.IO.File]::Create($tmpZip)
         $buffer = New-Object byte[] 65536
         $downloaded = 0
         $lastPct = -1
+        $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
         while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
             $fileStream.Write($buffer, 0, $bytesRead)
@@ -329,8 +345,10 @@ function Install-AndroidSdk {
                 if ($pct -ne $lastPct) {
                     $mbDown = [math]::Round($downloaded / 1MB, 1)
                     $mbTotal = [math]::Round($totalBytes / 1MB, 1)
+                    $elapsed = $sw.Elapsed.TotalSeconds
+                    $speed = if ($elapsed -gt 0) { [math]::Round(($downloaded / 1MB) / $elapsed, 1) } else { 0 }
                     Write-Progress -Activity "Downloading Android SDK" `
-                        -Status "${mbDown} MB / ${mbTotal} MB" `
+                        -Status "${mbDown} MB / ${mbTotal} MB  (${speed} MB/s)" `
                         -PercentComplete $pct
                     $lastPct = $pct
                 }
@@ -339,44 +357,87 @@ function Install-AndroidSdk {
         $fileStream.Close()
         $stream.Close()
         $httpClient.Dispose()
+        $sw.Stop()
         Write-Progress -Activity "Downloading Android SDK" -Completed
-        Write-Ok "Download complete"
+        $dlSecs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+        Write-Ok "Download complete ($([math]::Round($downloaded / 1MB, 1)) MB in ${dlSecs}s)"
+        $downloadOk = $true
     } catch {
-        Write-Warn "HttpClient failed ($($_.Exception.Message)), trying WebClient..."
+        Write-Warn "HttpClient failed: $($_.Exception.Message)"
+        Write-Info "  [2/2] Falling back to WebClient..."
         try {
             $wc = New-Object System.Net.WebClient
+            Write-Info "  [2/2] Downloading via WebClient (no progress bar)..."
             $wc.DownloadFile($toolsUrl, $tmpZip)
+            Write-Ok "WebClient download complete"
+            $downloadOk = $true
         } catch {
-            Write-Warn "WebClient also failed, last resort: Invoke-WebRequest..."
+            Write-Warn "WebClient also failed: $($_.Exception.Message)"
+            Write-Info "  [LAST] Falling back to Invoke-WebRequest (slowest method)..."
             $ProgressPreference = $prevPref
-            Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+            try {
+                Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+                Write-Ok "Invoke-WebRequest download complete"
+                $downloadOk = $true
+            } catch {
+                Write-Fail "All download methods failed: $($_.Exception.Message)"
+            }
         }
     } finally {
         $ProgressPreference = $prevPref
     }
 
-    if (-not (Test-Path $tmpZip) -or (Get-Item $tmpZip).Length -lt 1000000) {
-        Write-Fail "Download failed or file is too small. Check your internet connection."
+    if (-not $downloadOk) {
+        Write-Fail "Could not download Android SDK. Check your internet and firewall settings."
         return
     }
 
+    if (-not (Test-Path $tmpZip)) {
+        Write-Fail "Download file not found at $tmpZip"
+        return
+    }
+    $zipSize = (Get-Item $tmpZip).Length
+    if ($zipSize -lt 1000000) {
+        Write-Fail "Download file too small ($([math]::Round($zipSize / 1KB, 1)) KB) — likely incomplete or corrupted."
+        Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
+        return
+    }
+    Write-Info "Downloaded file size: $([math]::Round($zipSize / 1MB, 1)) MB — looks valid"
+
     Write-Info "Extracting to $sdkDir..."
-    Expand-Archive -Path $tmpZip -DestinationPath "$sdkDir\cmdline-tools" -Force
+    try {
+        Expand-Archive -Path $tmpZip -DestinationPath "$sdkDir\cmdline-tools" -Force
+    } catch {
+        Write-Fail "Extraction failed: $($_.Exception.Message)"
+        Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
+        return
+    }
     if (Test-Path "$sdkDir\cmdline-tools\cmdline-tools") {
         if (Test-Path "$sdkDir\cmdline-tools\latest") {
             Remove-Item "$sdkDir\cmdline-tools\latest" -Recurse -Force
         }
         Rename-Item "$sdkDir\cmdline-tools\cmdline-tools" "latest"
     }
-    Remove-Item $tmpZip -Force
+    Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
+    Write-Ok "Extraction complete"
+
+    if (-not (Test-Path "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat")) {
+        Write-Fail "sdkmanager not found after extraction — zip may be corrupted"
+        return
+    }
 
     $env:ANDROID_HOME = $sdkDir
     $env:Path = "$sdkDir\cmdline-tools\latest\bin;$sdkDir\platform-tools;$env:Path"
 
     Write-Info "Accepting licenses & installing platform-tools + SDK 31..."
     $sdkmanager = "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat"
-    echo "y" | & $sdkmanager --licenses 2>$null
-    & $sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+    try {
+        echo "y" | & $sdkmanager --licenses 2>$null
+        & $sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+    } catch {
+        Write-Fail "sdkmanager failed: $($_.Exception.Message)"
+        return
+    }
 
     $script:detectedAndroidHome = $sdkDir
     Write-Ok "Android SDK installed at $sdkDir"

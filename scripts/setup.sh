@@ -441,29 +441,75 @@ install_android_sdk() {
   # Ensure curl and unzip are available
   ensure_prereqs
 
-  info "Downloading Android command-line tools (~150 MB, may take a few minutes)..."
+  info "Downloading Android command-line tools (~150 MB)..."
+  info "  URL: $TOOLS_URL"
+  info "  Destination: $TMP_ZIP"
+  info "  Connecting to dl.google.com..."
+  local HTTP_CODE
+  HTTP_CODE=$(curl -sL -o /dev/null -w "%{http_code}" --connect-timeout 15 "$TOOLS_URL" 2>/dev/null || echo "000")
+  if [[ "$HTTP_CODE" == "000" ]]; then
+    fail "Cannot reach dl.google.com — check your internet connection or firewall."
+    return 1
+  elif [[ "$HTTP_CODE" != "200" ]]; then
+    fail "Server returned HTTP $HTTP_CODE — URL may be invalid."
+    return 1
+  fi
+  info "  Connected (HTTP $HTTP_CODE). Starting download..."
+
   curl --progress-bar --retry 3 --retry-delay 5 --connect-timeout 30 --max-time 600 \
     -fSL "$TOOLS_URL" -o "$TMP_ZIP"
-
-  if [[ ! -s "$TMP_ZIP" ]]; then
-    fail "Download failed or file is empty. Check your internet connection."
+  local CURL_EXIT=$?
+  if [[ $CURL_EXIT -ne 0 ]]; then
+    fail "curl exited with code $CURL_EXIT. Network issue or server unreachable."
+    rm -f "$TMP_ZIP" 2>/dev/null
     return 1
   fi
 
-  info "Extracting..."
-  unzip -qo "$TMP_ZIP" -d "$SDK_DIR/cmdline-tools"
+  if [[ ! -s "$TMP_ZIP" ]]; then
+    fail "Download file is empty or missing."
+    return 1
+  fi
+
+  local ZIP_SIZE
+  ZIP_SIZE=$(stat -f%z "$TMP_ZIP" 2>/dev/null || stat -c%s "$TMP_ZIP" 2>/dev/null || echo "0")
+  local ZIP_MB
+  ZIP_MB=$(awk "BEGIN {printf \"%.1f\", $ZIP_SIZE / 1048576}")
+  if [[ "$ZIP_SIZE" -lt 1000000 ]]; then
+    fail "Download too small (${ZIP_MB} MB) — likely incomplete or corrupted."
+    rm -f "$TMP_ZIP"
+    return 1
+  fi
+  ok "Download complete (${ZIP_MB} MB)"
+
+  info "Extracting to $SDK_DIR/cmdline-tools..."
+  if ! unzip -qo "$TMP_ZIP" -d "$SDK_DIR/cmdline-tools"; then
+    fail "Extraction failed — zip may be corrupted."
+    rm -f "$TMP_ZIP"
+    return 1
+  fi
   if [[ -d "$SDK_DIR/cmdline-tools/cmdline-tools" ]]; then
     rm -rf "$SDK_DIR/cmdline-tools/latest" 2>/dev/null || true
     mv "$SDK_DIR/cmdline-tools/cmdline-tools" "$SDK_DIR/cmdline-tools/latest"
   fi
   rm -f "$TMP_ZIP"
+  ok "Extraction complete"
+
+  if [[ ! -f "$SDK_DIR/cmdline-tools/latest/bin/sdkmanager" ]]; then
+    fail "sdkmanager not found after extraction — zip may be corrupted."
+    return 1
+  fi
 
   export ANDROID_HOME="$SDK_DIR"
   export PATH="$SDK_DIR/cmdline-tools/latest/bin:$SDK_DIR/platform-tools:$PATH"
 
   info "Accepting licenses & installing platform-tools + SDK 31..."
-  yes | sdkmanager --licenses 2>/dev/null || true
-  sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+  if ! (yes | sdkmanager --licenses 2>/dev/null); then
+    warn "License acceptance had issues — continuing anyway"
+  fi
+  if ! sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"; then
+    fail "sdkmanager install failed. Check Java installation and network."
+    return 1
+  fi
 
   DETECTED_ANDROID_HOME="$SDK_DIR"
   ok "Android SDK installed at $SDK_DIR"
