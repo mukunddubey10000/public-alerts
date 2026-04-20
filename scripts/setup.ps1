@@ -306,6 +306,7 @@ if ($detectedJavaHome) {
     Write-Fail "JAVA_HOME could not be set."
     Write-Fail "Install JDK 17 from https://adoptium.net/ then set JAVA_HOME manually."
     Write-Fail "After installing, re-run: npm run setup"
+}
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # 3. Android SDK — scan all drives, install if missing, set ANDROID_HOME
