@@ -51,7 +51,11 @@ function Add-PersistentPath ($entry) {
     if ($currentUserPath -and $currentUserPath.ToLower().Contains($entry.ToLower())) {
         return  # already present
     }
-    $newPath = if ($currentUserPath) { "$currentUserPath;$entry" } else { $entry }
+    if ($currentUserPath) {
+        $newPath = "$currentUserPath;$entry"
+    } else {
+        $newPath = $entry
+    }
     [System.Environment]::SetEnvironmentVariable("Path", $newPath, "User")
     $env:Path = "$entry;$env:Path"  # current session
     Write-Ok "Added to PATH: $entry"
@@ -347,10 +351,17 @@ function Install-AndroidSdk {
                         $mbDown = [math]::Round($downloaded / 1MB, 1)
                         $mbTotal = [math]::Round($totalBytes / 1MB, 1)
                         $elapsed = $sw.Elapsed.TotalSeconds
-                        $speed = if ($elapsed -gt 0) { [math]::Round(($downloaded / 1MB) / $elapsed, 1) } else { 0 }
-                        Write-Progress -Activity "Downloading Android SDK" `
-                            -Status "${mbDown} MB / ${mbTotal} MB  (${speed} MB/s)" `
-                            -PercentComplete $pct
+                        if ($elapsed -gt 0) {
+                            $speed = [math]::Round(($downloaded / 1MB) / $elapsed, 1)
+                        } else {
+                            $speed = 0
+                        }
+                        $progressParams = @{
+                            Activity        = 'Downloading Android SDK'
+                            Status          = "${mbDown} MB / ${mbTotal} MB  (${speed} MB/s)"
+                            PercentComplete = $pct
+                        }
+                        Write-Progress @progressParams
                         $lastPct = $pct
                     }
                 }
@@ -533,14 +544,16 @@ if (-not (Test-Path "$projectDir\node_modules")) {
 # Summary
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""
-Write-Host "====================================================" -ForegroundColor Green
+Write-Host "════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host "  Setup complete!" -ForegroundColor Green
-Write-Host "====================================================" -ForegroundColor Green
+Write-Host "════════════════════════════════════════════════════" -ForegroundColor Green
 Write-Host ""
-$javaDisplay = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { '<not set>' }
-$androidDisplay = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { '<not set>' }
-Write-Host "  JAVA_HOME    = $javaDisplay" -ForegroundColor Cyan
-Write-Host "  ANDROID_HOME = $androidDisplay" -ForegroundColor Cyan
+if ($env:JAVA_HOME) { $javaDisplay = $env:JAVA_HOME } else { $javaDisplay = '<not set>' }
+if ($env:ANDROID_HOME) { $androidDisplay = $env:ANDROID_HOME } else { $androidDisplay = '<not set>' }
+Write-Host "  JAVA_HOME     = " -NoNewline
+Write-Host "$javaDisplay" -ForegroundColor Cyan
+Write-Host "  ANDROID_HOME  = " -NoNewline
+Write-Host "$androidDisplay" -ForegroundColor Cyan
 Write-Host ""
 
 if ($script:EnvChanged) {
@@ -548,7 +561,7 @@ if ($script:EnvChanged) {
     Write-Host ""
 }
 
-Write-Host "  npm start        -> Start Metro bundler" -ForegroundColor Cyan
-Write-Host "  npm run android  -> Run on Android" -ForegroundColor Cyan
-Write-Host "  npm run ios      -> Run on iOS" -ForegroundColor Cyan
+Write-Host "  " -NoNewline; Write-Host "npm start" -ForegroundColor Cyan -NoNewline; Write-Host "        $([char]0x2192) Start Metro bundler"
+Write-Host "  " -NoNewline; Write-Host "npm run android" -ForegroundColor Cyan -NoNewline; Write-Host "  $([char]0x2192) Run on Android"
+Write-Host "  " -NoNewline; Write-Host "npm run ios" -ForegroundColor Cyan -NoNewline; Write-Host "      $([char]0x2192) Run on iOS"
 Write-Host ""
