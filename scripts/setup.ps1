@@ -304,16 +304,52 @@ function Install-AndroidSdk {
     Write-Info "Downloading Android command-line tools (~150 MB, may take a few minutes)..."
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-    # Disable the PowerShell progress bar — it tanks download speed to near-zero
+    # Use .NET HttpClient with a streaming progress bar (fast, unlike Invoke-WebRequest)
     $prevPref = $ProgressPreference
     $ProgressPreference = 'SilentlyContinue'
     try {
-        # Try .NET WebClient first (much faster than Invoke-WebRequest)
-        $wc = New-Object System.Net.WebClient
-        $wc.DownloadFile($toolsUrl, $tmpZip)
+        $httpClient = New-Object System.Net.Http.HttpClient
+        $httpClient.Timeout = [TimeSpan]::FromMinutes(10)
+        $response = $httpClient.GetAsync($toolsUrl, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
+        $response.EnsureSuccessStatusCode() | Out-Null
+
+        $totalBytes = $response.Content.Headers.ContentLength
+        $stream = $response.Content.ReadAsStreamAsync().Result
+        $fileStream = [System.IO.File]::Create($tmpZip)
+        $buffer = New-Object byte[] 65536
+        $downloaded = 0
+        $lastPct = -1
+
+        while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+            $fileStream.Write($buffer, 0, $bytesRead)
+            $downloaded += $bytesRead
+            if ($totalBytes -and $totalBytes -gt 0) {
+                $pct = [math]::Floor(($downloaded / $totalBytes) * 100)
+                if ($pct -ne $lastPct) {
+                    $mbDown = [math]::Round($downloaded / 1MB, 1)
+                    $mbTotal = [math]::Round($totalBytes / 1MB, 1)
+                    Write-Progress -Activity "Downloading Android SDK" `
+                        -Status "${mbDown} MB / ${mbTotal} MB" `
+                        -PercentComplete $pct
+                    $lastPct = $pct
+                }
+            }
+        }
+        $fileStream.Close()
+        $stream.Close()
+        $httpClient.Dispose()
+        Write-Progress -Activity "Downloading Android SDK" -Completed
+        Write-Ok "Download complete"
     } catch {
-        Write-Warn "WebClient failed, falling back to Invoke-WebRequest..."
-        Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+        Write-Warn "HttpClient failed ($($_.Exception.Message)), trying WebClient..."
+        try {
+            $wc = New-Object System.Net.WebClient
+            $wc.DownloadFile($toolsUrl, $tmpZip)
+        } catch {
+            Write-Warn "WebClient also failed, last resort: Invoke-WebRequest..."
+            $ProgressPreference = $prevPref
+            Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+        }
     } finally {
         $ProgressPreference = $prevPref
     }
