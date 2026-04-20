@@ -365,8 +365,12 @@ function Install-AndroidSdk {
                     }
                     if ($totalBytes -and $totalBytes -gt 0) {
                         $mbTotal = [math]::Round($totalBytes / 1MB, 1)
-                        $remaining = if ($speed -gt 0) { [math]::Round(($totalBytes - $downloaded) / 1MB / $speed, 0) } else { 0 }
-                        $eta = if ($speed -gt 0) { "${remaining}s left" } else { "calculating..." }
+                        if ($speed -gt 0) {
+                            $remaining = [math]::Round(($totalBytes - $downloaded) / 1MB / $speed, 0)
+                            $eta = "${remaining}s left"
+                        } else {
+                            $eta = "calculating..."
+                        }
                         Write-Host ("`r  [DOWNLOAD] {0}% - {1} / {2} MB  ({3} MB/s, {4})    " -f $pct, $mbDown, $mbTotal, $speed, $eta) -NoNewline -ForegroundColor Cyan
                     } else {
                         Write-Host ("`r  [DOWNLOAD] {0} MB downloaded  ({1} MB/s)    " -f $mbDown, $speed) -NoNewline -ForegroundColor Cyan
