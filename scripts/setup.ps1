@@ -310,112 +310,71 @@ function Install-AndroidSdk {
     Write-Info "  Destination: $tmpZip"
     [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
-    # Use .NET HttpClient with a streaming progress bar (fast, unlike Invoke-WebRequest)
-    $prevPref = $ProgressPreference
-    $ProgressPreference = 'SilentlyContinue'
     $downloadOk = $false
+    $sw = [System.Diagnostics.Stopwatch]::StartNew()
+
+    # Method 1: WebClient with native-speed download + progress events
     try {
-        Write-Info "  [1/2] Loading System.Net.Http assembly..."
-        Add-Type -AssemblyName System.Net.Http
-        Write-Info "  [1/2] Creating HttpClient (timeout: 10 min)..."
-        $httpClient = New-Object System.Net.Http.HttpClient
-        $httpClient.Timeout = [TimeSpan]::FromMinutes(10)
-        Write-Info "  [1/2] Connecting to dl.google.com..."
-        $response = $httpClient.GetAsync($toolsUrl, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).Result
-        $statusCode = [int]$response.StatusCode
-        if ($statusCode -ne 200) {
-            throw "Server returned HTTP $statusCode"
-        }
-        Write-Info "  [1/2] Connected (HTTP $statusCode). Starting download..."
-
-        $totalBytes = $response.Content.Headers.ContentLength
-        if ($totalBytes -and $totalBytes -gt 0) {
-            $totalMB = [math]::Round($totalBytes / 1MB, 1)
-            Write-Info "  [1/2] File size: $totalMB MB"
-        } else {
-            Write-Warn "  [1/2] Server did not report file size - progress bar will be unavailable"
-        }
-        $stream = $response.Content.ReadAsStreamAsync().Result
-        $fileStream = [System.IO.File]::Create($tmpZip)
-        $buffer = New-Object byte[] 65536
-        $downloaded = 0
+        Write-Info "  Connecting to dl.google.com..."
+        $wc = New-Object System.Net.WebClient
         $lastPct = -1
-        $lastReportTime = [System.Diagnostics.Stopwatch]::StartNew()
-        $sw = [System.Diagnostics.Stopwatch]::StartNew()
-
-        try {
-            while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-                $fileStream.Write($buffer, 0, $bytesRead)
-                $downloaded += $bytesRead
-                # Report every 2 seconds or on percentage change
-                $shouldReport = ($lastReportTime.Elapsed.TotalSeconds -ge 2)
-                if ($totalBytes -and $totalBytes -gt 0) {
-                    $pct = [math]::Floor(($downloaded / $totalBytes) * 100)
-                    if ($pct -ne $lastPct) { $shouldReport = $true }
+        $progressAction = {
+            $pct = $EventArgs.ProgressPercentage
+            if ($pct -ne $script:lastPct) {
+                $script:lastPct = $pct
+                $mbDown = [math]::Round($EventArgs.BytesReceived / 1MB, 1)
+                $mbTotal = [math]::Round($EventArgs.TotalBytesToReceive / 1MB, 1)
+                $elapsed = $script:sw.Elapsed.TotalSeconds
+                if ($elapsed -gt 0) {
+                    $speed = [math]::Round($mbDown / $elapsed, 1)
                 } else {
-                    $pct = -1
+                    $speed = 0
                 }
-                if ($shouldReport) {
-                    $mbDown = [math]::Round($downloaded / 1MB, 1)
-                    $elapsed = $sw.Elapsed.TotalSeconds
-                    if ($elapsed -gt 0) {
-                        $speed = [math]::Round(($downloaded / 1MB) / $elapsed, 1)
-                    } else {
-                        $speed = 0
-                    }
-                    if ($totalBytes -and $totalBytes -gt 0) {
-                        $mbTotal = [math]::Round($totalBytes / 1MB, 1)
-                        if ($speed -gt 0) {
-                            $remaining = [math]::Round(($totalBytes - $downloaded) / 1MB / $speed, 0)
-                            $eta = "${remaining}s left"
-                        } else {
-                            $eta = "calculating..."
-                        }
-                        Write-Host ("`r  [DOWNLOAD] {0}% - {1} / {2} MB  ({3} MB/s, {4})    " -f $pct, $mbDown, $mbTotal, $speed, $eta) -NoNewline -ForegroundColor Cyan
-                    } else {
-                        Write-Host ("`r  [DOWNLOAD] {0} MB downloaded  ({1} MB/s)    " -f $mbDown, $speed) -NoNewline -ForegroundColor Cyan
-                    }
-                    $lastPct = $pct
-                    $lastReportTime.Restart()
+                if ($speed -gt 0 -and $mbTotal -gt 0) {
+                    $remaining = [math]::Round(($mbTotal - $mbDown) / $speed, 0)
+                    $eta = "${remaining}s left"
+                } else {
+                    $eta = "calculating..."
                 }
+                Write-Host ("`r  [DOWNLOAD] {0}% - {1} / {2} MB  ({3} MB/s, {4})    " -f $pct, $mbDown, $mbTotal, $speed, $eta) -NoNewline -ForegroundColor Cyan
             }
-            Write-Host ""  # newline after progress
-        } catch {
-            Write-Host ""  # newline after progress
-            throw
-        } finally {
-            $fileStream.Close()
-            $stream.Close()
         }
-        $httpClient.Dispose()
+        Register-ObjectEvent -InputObject $wc -EventName DownloadProgressChanged -Action $progressAction -SourceIdentifier 'DLProgress' | Out-Null
+        $task = $wc.DownloadFileTaskAsync($toolsUrl, $tmpZip)
+        # Poll until done — allows progress events to fire
+        while (-not $task.IsCompleted) {
+            [System.Threading.Thread]::Sleep(100)
+        }
+        Write-Host ""
+        Unregister-Event -SourceIdentifier 'DLProgress' -ErrorAction SilentlyContinue
+        if ($task.IsFaulted) {
+            throw $task.Exception.InnerException
+        }
         $sw.Stop()
         $dlSecs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
-        $dlMB = [math]::Round($downloaded / 1MB, 1)
+        $dlMB = [math]::Round((Get-Item $tmpZip).Length / 1MB, 1)
         Write-Ok ('Download complete ({0} MB in {1}s)' -f $dlMB, $dlSecs)
         $downloadOk = $true
     } catch {
-        Write-Warn "HttpClient failed: $($_.Exception.Message)"
-        Write-Info "  [2/2] Falling back to WebClient..."
+        Write-Host ""
+        Unregister-Event -SourceIdentifier 'DLProgress' -ErrorAction SilentlyContinue
+        Write-Warn "WebClient failed: $($_.Exception.Message)"
+        # Method 2: Invoke-WebRequest (no progress bar, but native speed)
+        Write-Info "  Falling back to Invoke-WebRequest..."
+        $prevPref = $ProgressPreference
         try {
-            $wc = New-Object System.Net.WebClient
-            Write-Info "  [2/2] Downloading via WebClient (no progress bar)..."
-            $wc.DownloadFile($toolsUrl, $tmpZip)
-            Write-Ok "WebClient download complete"
+            $ProgressPreference = 'SilentlyContinue'
+            Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
+            $sw.Stop()
+            $dlSecs = [math]::Round($sw.Elapsed.TotalSeconds, 1)
+            $dlMB = [math]::Round((Get-Item $tmpZip).Length / 1MB, 1)
+            Write-Ok ('Download complete ({0} MB in {1}s)' -f $dlMB, $dlSecs)
             $downloadOk = $true
         } catch {
-            Write-Warn "WebClient also failed: $($_.Exception.Message)"
-            Write-Info "  [LAST] Falling back to Invoke-WebRequest (slowest method)..."
+            Write-Fail "All download methods failed: $($_.Exception.Message)"
+        } finally {
             $ProgressPreference = $prevPref
-            try {
-                Invoke-WebRequest -Uri $toolsUrl -OutFile $tmpZip -UseBasicParsing
-                Write-Ok "Invoke-WebRequest download complete"
-                $downloadOk = $true
-            } catch {
-                Write-Fail "All download methods failed: $($_.Exception.Message)"
-            }
         }
-    } finally {
-        $ProgressPreference = $prevPref
     }
 
     if (-not $downloadOk) {
