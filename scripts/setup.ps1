@@ -337,25 +337,28 @@ function Install-AndroidSdk {
         $lastPct = -1
         $sw = [System.Diagnostics.Stopwatch]::StartNew()
 
-        while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
-            $fileStream.Write($buffer, 0, $bytesRead)
-            $downloaded += $bytesRead
-            if ($totalBytes -and $totalBytes -gt 0) {
-                $pct = [math]::Floor(($downloaded / $totalBytes) * 100)
-                if ($pct -ne $lastPct) {
-                    $mbDown = [math]::Round($downloaded / 1MB, 1)
-                    $mbTotal = [math]::Round($totalBytes / 1MB, 1)
-                    $elapsed = $sw.Elapsed.TotalSeconds
-                    $speed = if ($elapsed -gt 0) { [math]::Round(($downloaded / 1MB) / $elapsed, 1) } else { 0 }
-                    Write-Progress -Activity "Downloading Android SDK" `
-                        -Status "${mbDown} MB / ${mbTotal} MB  (${speed} MB/s)" `
-                        -PercentComplete $pct
-                    $lastPct = $pct
+        try {
+            while (($bytesRead = $stream.Read($buffer, 0, $buffer.Length)) -gt 0) {
+                $fileStream.Write($buffer, 0, $bytesRead)
+                $downloaded += $bytesRead
+                if ($totalBytes -and $totalBytes -gt 0) {
+                    $pct = [math]::Floor(($downloaded / $totalBytes) * 100)
+                    if ($pct -ne $lastPct) {
+                        $mbDown = [math]::Round($downloaded / 1MB, 1)
+                        $mbTotal = [math]::Round($totalBytes / 1MB, 1)
+                        $elapsed = $sw.Elapsed.TotalSeconds
+                        $speed = if ($elapsed -gt 0) { [math]::Round(($downloaded / 1MB) / $elapsed, 1) } else { 0 }
+                        Write-Progress -Activity "Downloading Android SDK" `
+                            -Status "${mbDown} MB / ${mbTotal} MB  (${speed} MB/s)" `
+                            -PercentComplete $pct
+                        $lastPct = $pct
+                    }
                 }
             }
+        } finally {
+            $fileStream.Close()
+            $stream.Close()
         }
-        $fileStream.Close()
-        $stream.Close()
         $httpClient.Dispose()
         $sw.Stop()
         Write-Progress -Activity "Downloading Android SDK" -Completed
@@ -416,7 +419,7 @@ function Install-AndroidSdk {
         if (Test-Path "$sdkDir\cmdline-tools\latest") {
             Remove-Item "$sdkDir\cmdline-tools\latest" -Recurse -Force
         }
-        Rename-Item "$sdkDir\cmdline-tools\cmdline-tools" "latest"
+        Rename-Item -Path "$sdkDir\cmdline-tools\cmdline-tools" -NewName "latest"
     }
     Remove-Item $tmpZip -Force -ErrorAction SilentlyContinue
     Write-Ok "Extraction complete"
@@ -431,11 +434,14 @@ function Install-AndroidSdk {
 
     Write-Info "Accepting licenses & installing platform-tools + SDK 31..."
     $sdkmanager = "$sdkDir\cmdline-tools\latest\bin\sdkmanager.bat"
-    try {
-        echo "y" | & $sdkmanager --licenses 2>$null
-        & $sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
-    } catch {
-        Write-Fail "sdkmanager failed: $($_.Exception.Message)"
+    "y" | & $sdkmanager --licenses 2>$null
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "sdkmanager --licenses failed (exit code $LASTEXITCODE)"
+        return
+    }
+    & $sdkmanager "platform-tools" "platforms;android-31" "build-tools;31.0.0"
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "sdkmanager install failed (exit code $LASTEXITCODE)"
         return
     }
 
@@ -500,10 +506,10 @@ if (Get-Command adb -ErrorAction SilentlyContinue) {
 # ═══════════════════════════════════════════════════════════════════════════════
 Write-Host ""
 Write-Info "Checking React Native CLI..."
-try {
-    $null = npx react-native --version 2>$null
+$null = npx react-native --version 2>$null
+if ($LASTEXITCODE -eq 0) {
     Write-Ok "react-native CLI available (via npx)"
-} catch {
+} else {
     Write-Warn "react-native CLI not accessible. Will be available after npm install."
 }
 
