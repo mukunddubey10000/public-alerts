@@ -39,7 +39,6 @@ function Refresh-Path {
 
 # ─── Persist an env var to User environment ───────────────────────────────────
 function Set-PersistentEnv ($varName, $varValue) {
-    $env:($varName) = $varValue                    # current session
     Set-Item -Path "Env:\$varName" -Value $varValue
     [System.Environment]::SetEnvironmentVariable($varName, $varValue, "User")
     Write-Ok "Set $varName = $varValue (User environment)"
@@ -348,8 +347,10 @@ Write-Host "====================================================" -ForegroundCol
 Write-Host "  Setup complete!" -ForegroundColor Green
 Write-Host "====================================================" -ForegroundColor Green
 Write-Host ""
-Write-Host "  JAVA_HOME    = $($env:JAVA_HOME ?? '<not set>')" -ForegroundColor Cyan
-Write-Host "  ANDROID_HOME = $($env:ANDROID_HOME ?? '<not set>')" -ForegroundColor Cyan
+$javaDisplay = if ($env:JAVA_HOME) { $env:JAVA_HOME } else { '<not set>' }
+$androidDisplay = if ($env:ANDROID_HOME) { $env:ANDROID_HOME } else { '<not set>' }
+Write-Host "  JAVA_HOME    = $javaDisplay" -ForegroundColor Cyan
+Write-Host "  ANDROID_HOME = $androidDisplay" -ForegroundColor Cyan
 Write-Host ""
 
 if ($script:EnvChanged) {
@@ -360,5 +361,4 @@ if ($script:EnvChanged) {
 Write-Host "  npm start        -> Start Metro bundler" -ForegroundColor Cyan
 Write-Host "  npm run android  -> Run on Android" -ForegroundColor Cyan
 Write-Host "  npm run ios      -> Run on iOS" -ForegroundColor Cyan
-Write-Host ""
 Write-Host ""

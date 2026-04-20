@@ -12,11 +12,35 @@ fail()  { echo -e "${RED}[FAIL]${NC}  $1"; }
 # ─── OS Detection ─────────────────────────────────────────────────────────────
 OS="$(uname -s)"
 case "$OS" in
-  Darwin) PLATFORM="mac" ;;
-  Linux)  PLATFORM="linux" ;;
-  *)      fail "Unsupported OS: $OS (use setup.ps1 for Windows)"; exit 1 ;;
+  Darwin)       PLATFORM="mac" ;;
+  Linux)        PLATFORM="linux" ;;
+  MINGW*|MSYS*) fail "Detected Git Bash / MSYS on Windows."
+                fail "Run this instead:  powershell -ExecutionPolicy Bypass -File scripts/setup.ps1"
+                fail "Or use:  npm run setup  (auto-detects OS)"
+                exit 1 ;;
+  *)            fail "Unsupported OS: $OS"; exit 1 ;;
 esac
 info "Detected platform: $PLATFORM"
+
+# ─── Linux distro / package manager detection ────────────────────────────────
+PKG_MGR=""
+if [[ "$PLATFORM" == "linux" ]]; then
+  if command -v apt-get &>/dev/null; then
+    PKG_MGR="apt"
+  elif command -v dnf &>/dev/null; then
+    PKG_MGR="dnf"
+  elif command -v yum &>/dev/null; then
+    PKG_MGR="yum"
+  elif command -v pacman &>/dev/null; then
+    PKG_MGR="pacman"
+  elif command -v zypper &>/dev/null; then
+    PKG_MGR="zypper"
+  else
+    warn "Could not detect Linux package manager (apt/dnf/yum/pacman/zypper)."
+    warn "You may need to install dependencies manually."
+  fi
+  [[ -n "$PKG_MGR" ]] && info "Linux package manager: $PKG_MGR"
+fi
 
 # ─── Shell profile detection ─────────────────────────────────────────────────
 detect_shell_profile() {
@@ -88,10 +112,13 @@ persist_path_entry() {
 }
 
 # ─── Package manager helper ──────────────────────────────────────────────────
+# Usage: install_pkg "display name" "brew_pkg" "apt_pkg" ["dnf_pkg"] ["pacman_pkg"]
 install_pkg() {
   local name="$1"
   local brew_pkg="${2:-$1}"
   local apt_pkg="${3:-$1}"
+  local dnf_pkg="${4:-$apt_pkg}"      # fallback to apt name
+  local pacman_pkg="${5:-$apt_pkg}"    # fallback to apt name
 
   if [[ "$PLATFORM" == "mac" ]]; then
     if ! command -v brew &>/dev/null; then
@@ -101,29 +128,38 @@ install_pkg() {
     info "Installing $name via Homebrew..."
     brew install "$brew_pkg"
   else
-    info "Installing $name via apt..."
-    sudo apt-get update -qq
-    sudo apt-get install -y "$apt_pkg"
+    case "$PKG_MGR" in
+      apt)
+        info "Installing $name via apt..."
+        sudo apt-get update -qq
+        sudo apt-get install -y "$apt_pkg" ;;
+      dnf)
+        info "Installing $name via dnf..."
+        sudo dnf install -y "$dnf_pkg" ;;
+      yum)
+        info "Installing $name via yum..."
+        sudo yum install -y "$dnf_pkg" ;;
+      pacman)
+        info "Installing $name via pacman..."
+        sudo pacman -S --noconfirm "$pacman_pkg" ;;
+      zypper)
+        info "Installing $name via zypper..."
+        sudo zypper install -y "$dnf_pkg" ;;
+      *)
+        fail "No supported package manager found. Install $name manually."
+        return 1 ;;
+    esac
   fi
 }
 
-# ─── Scan filesystem for a directory matching a pattern ───────────────────────
-# Usage: scan_paths "description" path1 path2 ...
-# Returns the first existing path, or empty string
-scan_paths() {
-  local desc="$1"; shift
-  for candidate in "$@"; do
-    # Expand globs
-    for resolved in $candidate; do
-      if [[ -d "$resolved" ]]; then
-        info "Found $desc at: $resolved"
-        echo "$resolved"
-        return 0
-      fi
-    done
+# ─── Ensure prerequisites exist ──────────────────────────────────────────────
+ensure_prereqs() {
+  for cmd in curl unzip; do
+    if ! command -v "$cmd" &>/dev/null; then
+      warn "$cmd not found. Installing..."
+      install_pkg "$cmd" "$cmd" "$cmd" "$cmd" "$cmd"
+    fi
   done
-  echo ""
-  return 1
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -135,7 +171,7 @@ if command -v node &>/dev/null; then
   ok "Node.js $(node -v)"
 else
   warn "Node.js not found."
-  install_pkg "Node.js" "node" "nodejs"
+  install_pkg "Node.js" "node" "nodejs" "nodejs" "nodejs"
 fi
 
 info "Checking npm..."
@@ -153,19 +189,26 @@ echo ""
 info "Checking JDK..."
 
 detect_java_home() {
-  # 1) If javac is on PATH, derive from it
+  # 1) If javac is on PATH and actually works (macOS has a stub at /usr/bin/javac)
   if command -v javac &>/dev/null; then
-    local javac_real
-    if [[ "$PLATFORM" == "mac" ]]; then
-      javac_real="$(command -v javac)"
-      # On macOS, follow the symlink chain
-      while [[ -L "$javac_real" ]]; do javac_real="$(readlink "$javac_real")"; done
-    else
-      javac_real="$(readlink -f "$(command -v javac)")"
+    # Verify javac actually runs (macOS /usr/bin/javac is a shim that fails if no JDK installed)
+    if javac -version &>/dev/null; then
+      local javac_real
+      if [[ "$PLATFORM" == "mac" ]]; then
+        javac_real="$(command -v javac)"
+        # On macOS, follow the symlink chain
+        while [[ -L "$javac_real" ]]; do javac_real="$(readlink "$javac_real")"; done
+      else
+        javac_real="$(readlink -f "$(command -v javac)")"
+      fi
+      local candidate
+      candidate="$(dirname "$(dirname "$javac_real")")"
+      # Sanity check: reject /usr or other system dirs that aren't real JDK homes
+      if [[ -x "$candidate/bin/javac" ]] && "$candidate/bin/javac" -version &>/dev/null; then
+        echo "$candidate"
+        return 0
+      fi
     fi
-    # javac is in <JAVA_HOME>/bin/javac
-    echo "$(dirname "$(dirname "$javac_real")")"
-    return 0
   fi
 
   # 2) macOS: use java_home utility
@@ -177,25 +220,33 @@ detect_java_home() {
 
   # 3) Scan known directories
   local candidates=()
+  local brew_prefix
+  brew_prefix="$(brew --prefix 2>/dev/null || echo "")"
   if [[ "$PLATFORM" == "mac" ]]; then
     candidates=(
       "/Library/Java/JavaVirtualMachines/openjdk-17.jdk/Contents/Home"
       "/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home"
       "/Library/Java/JavaVirtualMachines/zulu-17.jdk/Contents/Home"
       "/Library/Java/JavaVirtualMachines/"*"/Contents/Home"
-      "$(brew --prefix 2>/dev/null)/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
-      "$(brew --prefix 2>/dev/null)/opt/openjdk/libexec/openjdk.jdk/Contents/Home"
     )
+    if [[ -n "$brew_prefix" ]]; then
+      candidates+=(
+        "$brew_prefix/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home"
+        "$brew_prefix/opt/openjdk/libexec/openjdk.jdk/Contents/Home"
+      )
+    fi
   else
     candidates=(
       "/usr/lib/jvm/java-17-openjdk-amd64"
       "/usr/lib/jvm/java-17-openjdk-arm64"
       "/usr/lib/jvm/java-17-openjdk"
+      "/usr/lib/jvm/java-17-openjdk"         # Arch/Fedora
       "/usr/lib/jvm/temurin-17-jdk-amd64"
       "/usr/lib/jvm/"*"-17"*
-      "/usr/lib/jvm/default-java"
+      "/usr/lib/jvm/default-java"             # Debian/Ubuntu alternative
+      "/usr/lib/jvm/default"                  # Arch
       "/usr/lib/jvm/"*
-      "$HOME/.sdkman/candidates/java/current"
+      "$HOME/.sdkman/candidates/java/current" # SDKMAN
     )
   fi
 
@@ -229,8 +280,13 @@ else
     sudo ln -sfn "$(brew --prefix openjdk@17)/libexec/openjdk.jdk" \
       /Library/Java/JavaVirtualMachines/openjdk-17.jdk 2>/dev/null || true
   else
-    sudo apt-get update -qq
-    sudo apt-get install -y openjdk-17-jdk
+    case "$PKG_MGR" in
+      apt)     sudo apt-get update -qq && sudo apt-get install -y openjdk-17-jdk ;;
+      dnf|yum) sudo "$PKG_MGR" install -y java-17-openjdk-devel ;;
+      pacman)  sudo pacman -S --noconfirm jdk17-openjdk ;;
+      zypper)  sudo zypper install -y java-17-openjdk-devel ;;
+      *)       fail "Cannot auto-install JDK. Install JDK 17 manually."; return 1 ;;
+    esac
   fi
   DETECTED_JAVA_HOME="$(detect_java_home || true)"
   ok "JDK 17 installed at $DETECTED_JAVA_HOME"
@@ -260,14 +316,16 @@ detect_android_home() {
 
   # 2) Scan known directories
   local candidates=()
+  local brew_prefix
+  brew_prefix="$(brew --prefix 2>/dev/null || echo "")"
   if [[ "$PLATFORM" == "mac" ]]; then
     candidates=(
       "$HOME/Library/Android/sdk"
       "$HOME/Android/Sdk"
       "/opt/android-sdk"
       "/usr/local/share/android-sdk"
-      "$(brew --prefix 2>/dev/null)/share/android-sdk"
     )
+    [[ -n "$brew_prefix" ]] && candidates+=("$brew_prefix/share/android-sdk")
   else
     candidates=(
       "$HOME/Android/Sdk"
@@ -306,6 +364,9 @@ install_android_sdk() {
 
   local TMP_ZIP
   TMP_ZIP="$(mktemp /tmp/android-cmdline-tools-XXXXXX.zip)"
+  # Ensure curl and unzip are available
+  ensure_prereqs
+
   info "Downloading Android command-line tools..."
   curl -fSL "$TOOLS_URL" -o "$TMP_ZIP"
 
