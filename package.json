@@ -11,6 +11,7 @@
     "start": "cross-env NODE_OPTIONS=--openssl-legacy-provider react-native start",
     "start:reset": "cross-env NODE_OPTIONS=--openssl-legacy-provider react-native start --reset-cache",
     "android": "react-native run-android",
+    "android:usb": "adb reverse tcp:8081 tcp:8081 && react-native run-android",
     "android:build": "cd android && gradlew assembleDebug && cd ..",
     "android:build:unix": "cd android && ./gradlew assembleDebug && cd ..",
     "android:install": "adb install android/app/build/outputs/apk/debug/app-debug.apk",

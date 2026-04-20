@@ -55,13 +55,25 @@ If you get cache issues:
 npm run start:reset
 ```
 
-### Run on Android (Device or Emulator)
+### Run on Android (Physical Device via USB)
 
-Connect a device via USB (with USB debugging enabled) or start an emulator, then:
+1. **Enable Developer Options** on your phone:
+   - Go to **Settings > About Phone** and tap **Build Number** 7 times
+2. **Enable USB Debugging**:
+   - Go to **Settings > Developer Options > USB Debugging** and turn it on
+3. **Connect your phone** via USB cable
+4. When prompted on the phone, tap **Allow USB Debugging** (check "Always allow")
+5. Verify the device is detected:
+   ```bash
+   adb devices
+   ```
+   You should see your device listed as `device` (not `unauthorized`).
+6. Run the app:
+   ```bash
+   npm run android
+   ```
 
-```bash
-npm run android
-```
+> **Tip:** If Metro bundler can't connect to your device, run `adb reverse tcp:8081 tcp:8081` to forward the port.
 
 ### Run on iOS (macOS only)
 
@@ -99,7 +111,8 @@ npm run android:install
 | `npm run setup` | Install all prerequisites (Node, JDK, Android SDK) |
 | `npm start` | Start Metro bundler |
 | `npm run start:reset` | Start Metro with cleared cache |
-| `npm run android` | Build, install, and launch on Android device/emulator |
+| `npm run android` | Build, install, and launch on Android device |
+| `npm run android:usb` | Set up adb port forwarding + run on USB device |
 | `npm run android:build` | Build debug APK (Windows) |
 | `npm run android:build:unix` | Build debug APK (macOS/Linux) |
 | `npm run android:install` | Install debug APK via adb |
@@ -134,6 +147,25 @@ sdkmanager "platform-tools" "platforms;android-31" "build-tools;30.0.3"
 ```bash
 npm run start:reset
 ```
+
+### `JAVA_HOME` is set to an invalid directory
+If you see errors about `JAVA_HOME`, run `npm run setup` — it auto-detects and fixes stale `JAVA_HOME` values. Or manually fix:
+```bash
+# macOS — find your installed JDK:
+/usr/libexec/java_home -V
+export JAVA_HOME=$(/usr/libexec/java_home)
+
+# Windows (PowerShell):
+# Check where JDK is installed, then:
+[System.Environment]::SetEnvironmentVariable("JAVA_HOME", "C:\Program Files\Microsoft\jdk-17", "User")
+```
+
+### Device not detected by `adb devices`
+1. Make sure USB Debugging is enabled (see [Run on Android](#run-on-android-physical-device-via-usb))
+2. Try a different USB cable (some cables are charge-only)
+3. On the phone, revoke USB debugging authorizations and re-allow:
+   - **Settings > Developer Options > Revoke USB Debugging Authorizations**
+4. Restart adb: `adb kill-server && adb devices`
 
 ## Project Structure
 
