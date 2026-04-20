@@ -467,6 +467,8 @@ if ($detectedAndroidHome) {
 } else {
     Write-Warn "Android SDK not found on any drive."
     Install-AndroidSdk
+    # Re-read the variable set by Install-AndroidSdk
+    $detectedAndroidHome = $script:detectedAndroidHome
 }
 
 # Validate existing ANDROID_HOME — clear it if it points to a bad path
@@ -510,19 +512,28 @@ Write-Info "Checking adb..."
 if (Get-Command adb -ErrorAction SilentlyContinue) {
     Write-Ok "adb: $((Get-Command adb).Source)"
 } elseif ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\platform-tools\adb.exe")) {
+    Add-PersistentPath "$detectedAndroidHome\platform-tools"
+    Refresh-Path
     Write-Ok "adb: $detectedAndroidHome\platform-tools\adb.exe"
 } else {
     Write-Warn "adb not found. Installing platform-tools..."
     if ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat")) {
         & "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat" "platform-tools"
-        Write-Ok "adb installed via sdkmanager"
+        if ($LASTEXITCODE -eq 0) {
+            Add-PersistentPath "$detectedAndroidHome\platform-tools"
+            Refresh-Path
+            Write-Ok "adb installed via sdkmanager"
+        } else {
+            Write-Fail "sdkmanager platform-tools failed (exit code $LASTEXITCODE)"
+        }
     } else {
         Write-Warn "Android SDK not available either. Installing full Android SDK first..."
         Install-AndroidSdk
-        if ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat")) {
-            & "$detectedAndroidHome\cmdline-tools\latest\bin\sdkmanager.bat" "platform-tools"
+        $detectedAndroidHome = $script:detectedAndroidHome
+        if ($detectedAndroidHome -and (Test-Path "$detectedAndroidHome\platform-tools\adb.exe")) {
             Set-PersistentEnv "ANDROID_HOME" $detectedAndroidHome
             Add-PersistentPath "$detectedAndroidHome\platform-tools"
+            Refresh-Path
             Write-Ok "Android SDK + adb installed at $detectedAndroidHome"
         } else {
             Write-Fail "Could not install Android SDK. Install Android Studio manually from https://developer.android.com/studio"

@@ -604,17 +604,21 @@ ADB_PATH="${DETECTED_ANDROID_HOME:-}/platform-tools/adb"
 if command -v adb &>/dev/null; then
   ok "adb: $(command -v adb)"
 elif [[ -x "$ADB_PATH" ]]; then
+  persist_path_entry "${DETECTED_ANDROID_HOME}/platform-tools"
   ok "adb: $ADB_PATH"
 else
   warn "adb not found. Installing platform-tools..."
   if [[ -n "${DETECTED_ANDROID_HOME:-}" && -x "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
-    "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
-    ok "adb installed via sdkmanager"
+    if "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"; then
+      persist_path_entry "$DETECTED_ANDROID_HOME/platform-tools"
+      ok "adb installed via sdkmanager"
+    else
+      fail "sdkmanager platform-tools failed."
+    fi
   else
     warn "Android SDK not available either. Installing full Android SDK first..."
     install_android_sdk
-    if [[ -n "${DETECTED_ANDROID_HOME:-}" && -x "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" ]]; then
-      "$DETECTED_ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platform-tools"
+    if [[ -n "${DETECTED_ANDROID_HOME:-}" && -x "$DETECTED_ANDROID_HOME/platform-tools/adb" ]]; then
       persist_env "ANDROID_HOME" "$DETECTED_ANDROID_HOME"
       persist_path_entry "$DETECTED_ANDROID_HOME/platform-tools"
       ok "Android SDK + adb installed at $DETECTED_ANDROID_HOME"
