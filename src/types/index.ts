@@ -10,13 +10,13 @@ export interface Location {
 
 export interface Incident {
   id: string;
-  type: 'ACCIDENT' | 'OUTAGE' | 'CONSTRUCTION' | 'HAZARD';
+  type: "ACCIDENT" | "OUTAGE" | "CONSTRUCTION" | "HAZARD";
   description: string;
   location: Location;
   createdAt: number; // timestamp
   createdBy: string;
   upvotes: number;
-  status: 'ACTIVE' | 'EXPIRED';
+  status: "ACTIVE" | "EXPIRED";
   imageUrl?: string;
 }
 
@@ -38,7 +38,7 @@ export interface Notification {
 }
 
 export interface FilterOptions {
-  types: ('ACCIDENT' | 'OUTAGE' | 'CONSTRUCTION' | 'HAZARD')[];
+  types: ("ACCIDENT" | "OUTAGE" | "CONSTRUCTION" | "HAZARD")[];
   radiusKm: number;
-  sortBy: 'distance' | 'recent' | 'upvotes';
+  sortBy: "distance" | "recent" | "upvotes";
 }
