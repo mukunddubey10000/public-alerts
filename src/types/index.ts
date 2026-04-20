@@ -42,13 +42,3 @@ export interface FilterOptions {
   radiusKm: number;
   sortBy: 'distance' | 'recent' | 'upvotes';
 }
-
-export interface HomeScreenData {
-  title: string;
-  description: string;
-}
-
-export interface ApiResponse<T> {
-  data: T;
-  error?: string;
-}

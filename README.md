@@ -1,76 +1,50 @@
-# My React Native App
+# CivicAlerts
 
-This is a simple React Native application that demonstrates the use of various components, navigation, and mocked backend logic.
+A React Native app for real-time community incident reporting and notifications. Users can report accidents, outages, construction, and hazards near them, and receive alerts about nearby incidents.
 
 ## Getting Started
 
-To get started with this project, follow the instructions below.
-
 ### Prerequisites
 
-Make sure you have the following installed on your machine:
-
-- Node.js (version 14 or higher)
-- npm or yarn
+- Node.js (v14+)
 - React Native CLI
+- Android Studio (for Android) or Xcode (for iOS)
 
 ### Installation
 
-1. Clone the repository:
-
-   ```
-   git clone <repository-url>
-   ```
-
-2. Navigate to the project directory:
-
-   ```
-   cd my-react-native-app
-   ```
-
-3. Install the dependencies:
-
-   ```
-   npm install
-   ```
-
-   or
-
-   ```
-   yarn install
-   ```
-
-### Running the Application
-
-To run the application, use the following command:
-
-```
-npm start
+```bash
+git clone <repository-url>
+cd public-alerts
+npm install
 ```
 
-or
+### Running
+
+```bash
+npm start          # Start Metro bundler
+npm run android    # Run on Android
+npm run ios        # Run on iOS
+```
+
+## Project Structure
 
 ```
-yarn start
+src/
+  App.tsx                        # App entry point
+  screens/HomeScreen.tsx         # Main screen with map, filters, reports
+  components/
+    Button.tsx                   # Reusable button
+    FilterPanel.tsx              # Incident type/radius filters
+    MapView.tsx                  # Map display (mocked)
+    NotificationsPanel.tsx       # Notification list
+    ReportModal.tsx              # New incident report form
+  hooks/useIncidents.ts          # Incident data hooks
+  services/mockData.ts           # Mock backend with CRUD & notifications
+  navigation/RootNavigator.tsx   # Tab navigation setup
+  types/index.ts                 # TypeScript interfaces
+  utils/geo.ts                   # Geolocation utilities (Haversine, bounding box)
 ```
 
-Then, follow the instructions in the terminal to run the app on your desired platform (iOS or Android).
+## Architecture
 
-### Project Structure
-
-- `src/App.tsx`: Main entry point of the application.
-- `src/screens/HomeScreen.tsx`: Displays the main content of the application.
-- `src/components/Button.tsx`: A customizable button component.
-- `src/navigation/RootNavigator.tsx`: Sets up the navigation structure.
-- `src/services/api.ts`: Contains mocked API logic.
-- `src/hooks/useCustom.ts`: Custom hook for reusable logic.
-- `src/types/index.ts`: TypeScript interfaces and types used throughout the application.
-- `__tests__/App.test.tsx`: Unit tests for the App component.
-
-### Contributing
-
-If you would like to contribute to this project, please fork the repository and submit a pull request.
-
-### License
-
-This project is licensed under the MIT License. See the LICENSE file for details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for system design details.
