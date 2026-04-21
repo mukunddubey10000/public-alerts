@@ -1,0 +1,72 @@
+COMMAND: gradlew.bat assembleRelease
+EXIT CODE: 1
+ERROR: Command failed: gradlew.bat assembleRelease
+========================================
+
+FATAL: Command failed: gradlew.bat assembleRelease
+Error: Command failed: gradlew.bat assembleRelease
+    at checkExecSyncError (node:child_process:890:11)
+    at Object.execSync (node:child_process:962:15)
+    at run (E:\Projects\public-alerts\scripts\clean-and-build-release.js:60:18)
+    at Object.<anonymous> (E:\Projects\public-alerts\scripts\clean-and-build-release.js:137:3)
+    at Module._compile (node:internal/modules/cjs/loader:1364:14)
+    at Module._extensions..js (node:internal/modules/cjs/loader:1422:10)
+    at Module.load (node:internal/modules/cjs/loader:1203:32)
+    at Module._load (node:internal/modules/cjs/loader:1019:12)
+    at Function.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:128:12)
+
+
+also
+========================================
+  Building Release APK
+========================================
+
+> gradlew.bat assembleRelease
+> Task :react-native-geolocation-service:generateReleaseRFile FAILED
+> Task :react-native-gesture-handler:generateReleaseRFile FAILED
+
+FAILURE: Build completed with 2 failures.
+
+1: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':react-native-geolocation-service:generateReleaseRFile'.
+> A failure occurred while executing com.android.build.gradle.internal.res.GenerateLibraryRFileTask$GenerateLibRFileRunnable
+   > C:\Users\Mukund\.gradle\caches\transforms-3\0f652f795b1e07d4e6c1eec724c51691\transformed\com.facebook.react-r.txt
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+==============================================================================
+
+2: Task failed with an exception.
+-----------
+* What went wrong:
+Execution failed for task ':react-native-gesture-handler:generateReleaseRFile'.
+> A failure occurred while executing com.android.build.gradle.internal.res.GenerateLibraryRFileTask$GenerateLibRFileRunnable
+   > C:\Users\Mukund\.gradle\caches\transforms-3\0f652f795b1e07d4e6c1eec724c51691\transformed\com.facebook.react-r.txt
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+==============================================================================
+
+* Get more help at https://help.gradle.org
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 8.0.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+See https://docs.gradle.org/7.6.3/userguide/command_line_interface.html#sec:command_line_warnings
+
+BUILD FAILED in 16s
+42 actionable tasks: 37 executed, 5 up-to-date
+
+========================================
+  BUILD FAILED
+  Error log saved to: E:\Projects\public-alerts\build-logs\build-error-20260421072658.txt
+========================================
+
+E:\Projects\public-alerts>
