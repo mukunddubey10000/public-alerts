@@ -113,26 +113,16 @@ try {
     rimrafGlob(tmpDir, prefix);
   });
 
-  // Step 4: Clean Android build artifacts
+  // Step 4: Stop Gradle daemon & clean Android build artifacts
   log("Cleaning Android build");
   var androidDir = path.join(PROJECT_ROOT, "android");
+  tryRun(GRADLEW + " --stop", androidDir);
   run(GRADLEW + " clean", androidDir);
   rimraf(path.join(androidDir, ".gradle"));
   rimraf(path.join(androidDir, "build"));
   rimraf(path.join(androidDir, "app", "build"));
 
-  // Step 5: Clear Gradle global caches (non-fatal; may fail on Windows if Gradle daemon holds locks)
-  log("Clearing Gradle caches");
-  var gradleHome = path.join(os.homedir(), ".gradle", "caches");
-  ["transforms-", "build-cache-"].forEach(function (prefix) {
-    try {
-      rimrafGlob(gradleHome, prefix);
-    } catch (e) {
-      console.log("  Warning: could not clear " + prefix + "* caches (" + e.code + "). Skipping.");
-    }
-  });
-
-  // Step 6: Build Release APK
+  // Step 5: Build Release APK
   log("Building Release APK");
   run(GRADLEW + " assembleRelease", androidDir);
 
