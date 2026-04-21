@@ -12,8 +12,12 @@ var os = require("os");
 var path = require("path");
 
 var PROJECT_ROOT = path.resolve(__dirname, "..");
-var TIMESTAMP = new Date().toISOString().replace(/[:\-T]/g, "").slice(0, 15);
-var ERROR_LOG = path.join(PROJECT_ROOT, "build-error-" + TIMESTAMP + ".log");
+var LOG_DIR = path.join(PROJECT_ROOT, "build-logs");  // Log folder
+
+// Fix the timestamp format to remove any extra dots or invalid characters
+var TIMESTAMP = new Date().toISOString().replace(/[:\-T]/g, "").slice(0, 15);  // Ensure no trailing dot
+var ERROR_LOG = path.join(LOG_DIR, "build-error-" + "hi" + ".txt");  // Log file with .txt extension
+
 var IS_WIN = process.platform === "win32";
 var GRADLEW = IS_WIN ? "gradlew.bat" : "./gradlew";
 var APK_OUTPUT = path.join(
@@ -26,6 +30,11 @@ var APK_OUTPUT = path.join(
   "release",
   "app-release.apk"
 );
+
+// Ensure the log directory exists
+if (!fs.existsSync(LOG_DIR)) {
+  fs.mkdirSync(LOG_DIR, { recursive: true });
+}
 
 var logStream = fs.createWriteStream(ERROR_LOG, { flags: "a" });
 
@@ -49,8 +58,12 @@ function run(cmd, cwd) {
     var output = "";
     if (err.stdout) output += err.stdout.toString();
     if (err.stderr) output += err.stderr.toString();
+
+    // Log the command and output to the error log
     logStream.write("COMMAND: " + cmd + "\n");
-    logStream.write(output + "\n\n");
+    logStream.write("ERROR MESSAGE:\n" + output + "\n");
+    logStream.write("========================================\n\n");
+
     console.error(output);
     throw err;
   }
@@ -89,7 +102,7 @@ try {
   // Step 2: Remove node_modules & reinstall
   log("Removing node_modules & reinstalling");
   rimraf(path.join(PROJECT_ROOT, "node_modules"));
-  run("npm install");
+  run("npm install --legacy-peer-deps");
 
   // Step 3: Clear Metro / React Native temp caches
   log("Clearing Metro / React Native cache");
@@ -125,11 +138,14 @@ try {
   console.log("APK location: " + APK_OUTPUT);
   console.log("");
 } catch (err) {
+  // On failure, end the log stream and display failure message
   logStream.end();
   console.log("");
   console.log("========================================");
   console.log("  BUILD FAILED");
   console.log("  Error log saved to: " + ERROR_LOG);
   console.log("========================================");
+
+  // Re-throw the error to stop the process and return failure code
   process.exit(1);
 }
