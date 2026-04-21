@@ -99,11 +99,7 @@ function rimrafGlob(dir, prefix) {
 // ──────────────────────────────────────────
 
 try {
-  // Step 1: Clear Watchman cache
-  log("Clearing Watchman cache");
-  tryRun("watchman watch-del-all");
-
-  // Step 2: Remove node_modules & reinstall
+  // Step 1: Remove node_modules & reinstall
   log("Removing node_modules & reinstalling");
   rimraf(path.join(PROJECT_ROOT, "node_modules"));
   run("npm install --legacy-peer-deps");
