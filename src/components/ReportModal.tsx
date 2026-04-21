@@ -1,338 +1,219 @@
 import React, { useState } from "react";
 import {
-	Modal,
-	View,
-	Text,
-	StyleSheet,
-	TouchableOpacity,
-	TextInput,
-	ScrollView,
-	Alert,
+  Modal,
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  TextInput,
+  ScrollView,
+  Alert,
 } from "react-native";
 import { Incident, Location } from "../types";
 import { createIncident } from "../services/mockData";
+import { useTheme, Theme } from "../theme/ThemeContext";
 
 interface ReportModalProps {
-	visible: boolean;
-	userLocation: Location;
-	onClose: () => void;
-	onSubmit: (incident: Incident) => void;
+  visible: boolean;
+  userLocation: Location;
+  onClose: () => void;
+  onSubmit: (incident: Incident) => void;
 }
 
 const ReportModal: React.FC<ReportModalProps> = ({
-	visible,
-	userLocation,
-	onClose,
-	onSubmit,
+  visible,
+  userLocation,
+  onClose,
+  onSubmit,
 }) => {
-	const [selectedType, setSelectedType] = useState<Incident["type"] | null>(
-		null,
-	);
-	const [description, setDescription] = useState("");
-	const [isSubmitting, setIsSubmitting] = useState(false);
+  const { theme } = useTheme();
+  const [selectedType, setSelectedType] = useState<Incident["type"] | null>(null);
+  const [description, setDescription] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-	const incidentTypes: Incident["type"][] = [
-		"ACCIDENT",
-		"OUTAGE",
-		"CONSTRUCTION",
-		"HAZARD",
-	];
+  const incidentTypes: Incident["type"][] = [
+    "ACCIDENT",
+    "OUTAGE",
+    "CONSTRUCTION",
+    "HAZARD",
+  ];
 
-	const handleSubmit = () => {
-		if (!selectedType || !description.trim()) {
-			Alert.alert("Error", "Please select a type and enter a description");
-			return;
-		}
+  const handleSubmit = () => {
+    if (!selectedType || !description.trim()) {
+      Alert.alert("Error", "Please select a type and enter a description");
+      return;
+    }
+    setIsSubmitting(true);
+    setTimeout(() => {
+      const newIncident = createIncident(selectedType, description.trim(), userLocation);
+      onSubmit(newIncident);
+      resetForm();
+      setIsSubmitting(false);
+      onClose();
+    }, 500);
+  };
 
-		setIsSubmitting(true);
-		// Simulate API call
-		setTimeout(() => {
-			const newIncident = createIncident(
-				selectedType,
-				description.trim(),
-				userLocation,
-			);
-			onSubmit(newIncident);
-			resetForm();
-			setIsSubmitting(false);
-			onClose();
-		}, 500);
-	};
+  const resetForm = () => {
+    setSelectedType(null);
+    setDescription("");
+  };
 
-	const resetForm = () => {
-		setSelectedType(null);
-		setDescription("");
-	};
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
 
-	const handleClose = () => {
-		resetForm();
-		onClose();
-	};
+  const s = createThemedStyles(theme);
+  const t = theme.colors;
 
-	return (
-		<Modal
-			visible={visible}
-			animationType="slide"
-			transparent={true}
-			onRequestClose={handleClose}
-		>
-			<View style={styles.container}>
-				<View style={styles.modal}>
-					{/* Header */}
-					<View style={styles.header}>
-						<Text style={styles.title}>Report an Incident</Text>
-						<TouchableOpacity onPress={handleClose}>
-							<Text style={styles.closeButton}>✕</Text>
-						</TouchableOpacity>
-					</View>
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={handleClose}>
+      <View style={s.overlay}>
+        <View style={s.modal}>
+          {/* Handle */}
+          <View style={s.handleRow}>
+            <View style={s.handle} />
+          </View>
 
-					<ScrollView style={styles.content}>
-						{/* Type Selection */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Type of Incident</Text>
-							<View style={styles.typeGrid}>
-								{incidentTypes.map((type) => (
-									<TouchableOpacity
-										key={type}
-										style={[
-											styles.typeButton,
-											selectedType === type && styles.typeButtonSelected,
-										]}
-										onPress={() => setSelectedType(type)}
-									>
-										<Text style={styles.typeEmoji}>
-											{getIncidentEmoji(type)}
-										</Text>
-										<Text style={styles.typeLabel}>{type}</Text>
-									</TouchableOpacity>
-								))}
-							</View>
-						</View>
+          {/* Header */}
+          <View style={s.header}>
+            <View>
+              <Text style={s.title}>Report Incident</Text>
+              <Text style={s.subtitle}>Help your community stay informed</Text>
+            </View>
+            <TouchableOpacity style={s.closeBtn} onPress={handleClose}>
+              <Text style={s.closeBtnText}>✕</Text>
+            </TouchableOpacity>
+          </View>
 
-						{/* Description */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Description</Text>
-							<TextInput
-								style={styles.input}
-								placeholder="Describe what happened..."
-								placeholderTextColor="#999"
-								multiline
-								numberOfLines={5}
-								value={description}
-								onChangeText={setDescription}
-								maxLength={500}
-							/>
-							<Text style={styles.charCount}>{description.length}/500</Text>
-						</View>
+          <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
+            {/* Type Selection */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Type of Incident</Text>
+              <View style={s.typeGrid}>
+                {incidentTypes.map((type) => {
+                  const sel = selectedType === type;
+                  return (
+                    <TouchableOpacity
+                      key={type}
+                      style={[s.typeBtn, sel && { backgroundColor: t.primary + "20", borderColor: t.primary }]}
+                      onPress={() => setSelectedType(type)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={s.typeEmoji}>{getEmoji(type)}</Text>
+                      <Text style={[s.typeLabel, sel && { color: t.primary }]}>{type}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
 
-						{/* Location Info */}
-						<View style={styles.section}>
-							<Text style={styles.sectionTitle}>Location</Text>
-							<View style={styles.locationBox}>
-								<Text style={styles.locationEmoji}>📍</Text>
-								<View>
-									<Text style={styles.locationText}>
-										Lat: {userLocation.lat.toFixed(4)}
-									</Text>
-									<Text style={styles.locationText}>
-										Lng: {userLocation.lng.toFixed(4)}
-									</Text>
-								</View>
-							</View>
-							<Text style={styles.hint}>
-								Location is captured automatically from your device
-							</Text>
-						</View>
-					</ScrollView>
+            {/* Description */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Description</Text>
+              <TextInput
+                style={s.input}
+                placeholder="Describe what happened..."
+                placeholderTextColor={t.placeholder}
+                multiline
+                numberOfLines={5}
+                value={description}
+                onChangeText={setDescription}
+                maxLength={500}
+              />
+              <Text style={s.charCount}>{description.length}/500</Text>
+            </View>
 
-					{/* Footer with Buttons */}
-					<View style={styles.footer}>
-						<TouchableOpacity
-							style={[styles.button, styles.cancelButton]}
-							onPress={handleClose}
-							disabled={isSubmitting}
-						>
-							<Text style={styles.cancelButtonText}>Cancel</Text>
-						</TouchableOpacity>
-						<TouchableOpacity
-							style={[
-								styles.button,
-								styles.submitButton,
-								(!selectedType || !description.trim() || isSubmitting) &&
-									styles.submitButtonDisabled,
-							]}
-							onPress={handleSubmit}
-							disabled={!selectedType || !description.trim() || isSubmitting}
-						>
-							<Text style={styles.submitButtonText}>
-								{isSubmitting ? "Submitting..." : "Submit Report"}
-							</Text>
-						</TouchableOpacity>
-					</View>
-				</View>
-			</View>
-		</Modal>
-	);
+            {/* Location */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Location</Text>
+              <View style={s.locationBox}>
+                <View style={s.locationIconWrap}>
+                  <Text style={s.locationEmoji}>📍</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.locationCoord}>Lat: {userLocation.lat.toFixed(4)}</Text>
+                  <Text style={s.locationCoord}>Lng: {userLocation.lng.toFixed(4)}</Text>
+                </View>
+                <View style={s.autoTag}>
+                  <Text style={s.autoTagText}>Auto</Text>
+                </View>
+              </View>
+              <Text style={s.hint}>Location is captured automatically from your device</Text>
+            </View>
+          </ScrollView>
+
+          {/* Footer */}
+          <View style={s.footer}>
+            <TouchableOpacity
+              style={s.cancelBtn}
+              onPress={handleClose}
+              disabled={isSubmitting}
+              activeOpacity={0.7}
+            >
+              <Text style={s.cancelBtnText}>Cancel</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[s.submitBtn, (!selectedType || !description.trim() || isSubmitting) && { opacity: 0.5 }]}
+              onPress={handleSubmit}
+              disabled={!selectedType || !description.trim() || isSubmitting}
+              activeOpacity={0.85}
+            >
+              <Text style={s.submitBtnText}>
+                {isSubmitting ? "Submitting..." : "Submit Report"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 };
 
-const getIncidentEmoji = (type: Incident["type"]): string => {
-	switch (type) {
-		case "ACCIDENT":
-			return "🚗";
-		case "OUTAGE":
-			return "⚡";
-		case "CONSTRUCTION":
-			return "🏗️";
-		case "HAZARD":
-			return "⚠️";
-		default:
-			return "📍";
-	}
+const getEmoji = (type: Incident["type"]): string => {
+  switch (type) {
+    case "ACCIDENT": return "🚗";
+    case "OUTAGE": return "⚡";
+    case "CONSTRUCTION": return "🏗️";
+    case "HAZARD": return "⚠️";
+    default: return "📍";
+  }
 };
 
-const styles = StyleSheet.create({
-	container: {
-		flex: 1,
-		backgroundColor: "rgba(0, 0, 0, 0.5)",
-		justifyContent: "flex-end",
-	},
-	modal: {
-		backgroundColor: "#fff",
-		borderTopLeftRadius: 20,
-		borderTopRightRadius: 20,
-		maxHeight: "90%",
-		paddingBottom: 20,
-	},
-	header: {
-		flexDirection: "row",
-		justifyContent: "space-between",
-		alignItems: "center",
-		paddingHorizontal: 20,
-		paddingVertical: 15,
-		borderBottomWidth: 1,
-		borderBottomColor: "#eee",
-	},
-	title: {
-		fontSize: 18,
-		fontWeight: "bold",
-		color: "#333",
-	},
-	closeButton: {
-		fontSize: 24,
-		color: "#999",
-	},
-	content: {
-		paddingHorizontal: 20,
-		paddingVertical: 15,
-	},
-	section: {
-		marginBottom: 20,
-	},
-	sectionTitle: {
-		fontSize: 14,
-		fontWeight: "bold",
-		color: "#333",
-		marginBottom: 10,
-	},
-	typeGrid: {
-		flexDirection: "row",
-		flexWrap: "wrap",
-		justifyContent: "space-between",
-	},
-	typeButton: {
-		width: "48%",
-		paddingVertical: 15,
-		paddingHorizontal: 10,
-		borderRadius: 10,
-		backgroundColor: "#f5f5f5",
-		alignItems: "center",
-		marginBottom: 10,
-		borderWidth: 2,
-		borderColor: "transparent",
-	},
-	typeButtonSelected: {
-		backgroundColor: "#E3F2FD",
-		borderColor: "#2196F3",
-	},
-	typeEmoji: {
-		fontSize: 32,
-		marginBottom: 5,
-	},
-	typeLabel: {
-		fontSize: 12,
-		fontWeight: "bold",
-		color: "#333",
-		textAlign: "center",
-	},
-	input: {
-		borderWidth: 1,
-		borderColor: "#ddd",
-		borderRadius: 8,
-		padding: 12,
-		fontSize: 14,
-		color: "#333",
-		textAlignVertical: "top",
-		maxHeight: 150,
-	},
-	charCount: {
-		fontSize: 12,
-		color: "#999",
-		marginTop: 5,
-		textAlign: "right",
-	},
-	locationBox: {
-		flexDirection: "row",
-		backgroundColor: "#f5f5f5",
-		padding: 12,
-		borderRadius: 8,
-		alignItems: "center",
-	},
-	locationEmoji: {
-		fontSize: 24,
-		marginRight: 10,
-	},
-	locationText: {
-		fontSize: 12,
-		color: "#555",
-		marginVertical: 2,
-	},
-	hint: {
-		fontSize: 12,
-		color: "#999",
-		marginTop: 8,
-		fontStyle: "italic",
-	},
-	footer: {
-		flexDirection: "row",
-		paddingHorizontal: 20,
-		paddingTop: 15,
-		gap: 10,
-	},
-	button: {
-		flex: 1,
-		paddingVertical: 12,
-		borderRadius: 8,
-		alignItems: "center",
-	},
-	cancelButton: {
-		backgroundColor: "#f5f5f5",
-	},
-	cancelButtonText: {
-		fontSize: 14,
-		fontWeight: "bold",
-		color: "#666",
-	},
-	submitButton: {
-		backgroundColor: "#2196F3",
-	},
-	submitButtonDisabled: {
-		backgroundColor: "#ccc",
-	},
-	submitButtonText: {
-		fontSize: 14,
-		fontWeight: "bold",
-		color: "#fff",
-	},
-});
+const createThemedStyles = (theme: Theme) => {
+  const t = theme.colors;
+  return StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: t.overlay, justifyContent: "flex-end" },
+    modal: { backgroundColor: t.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, maxHeight: "92%", paddingBottom: 20 },
+    handleRow: { alignItems: "center", paddingTop: 12, paddingBottom: 4 },
+    handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: t.border },
+    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.separator },
+    title: { fontSize: 18, fontWeight: "800", color: t.text },
+    subtitle: { fontSize: 12, color: t.textMuted, marginTop: 2 },
+    closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: t.background, justifyContent: "center", alignItems: "center" },
+    closeBtnText: { fontSize: 16, color: t.textSecondary },
+    content: { paddingHorizontal: 20, paddingVertical: 16 },
+    section: { marginBottom: 22 },
+    sectionTitle: { fontSize: 12, fontWeight: "700", color: t.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.8 },
+    typeGrid: { flexDirection: "row", flexWrap: "wrap", justifyContent: "space-between" },
+    typeBtn: { width: "48%", paddingVertical: 18, paddingHorizontal: 10, borderRadius: 14, backgroundColor: t.background, alignItems: "center", marginBottom: 10, borderWidth: 2, borderColor: "transparent" },
+    typeEmoji: { fontSize: 34, marginBottom: 6 },
+    typeLabel: { fontSize: 12, fontWeight: "700", color: t.text, textAlign: "center" },
+    input: { borderWidth: 1.5, borderColor: t.inputBorder, borderRadius: 12, padding: 14, fontSize: 14, color: t.inputText, backgroundColor: t.inputBg, textAlignVertical: "top", maxHeight: 150 },
+    charCount: { fontSize: 11, color: t.textMuted, marginTop: 6, textAlign: "right" },
+    locationBox: { flexDirection: "row", backgroundColor: t.background, padding: 14, borderRadius: 12, alignItems: "center" },
+    locationIconWrap: { width: 42, height: 42, borderRadius: 12, backgroundColor: t.primary + "15", justifyContent: "center", alignItems: "center", marginRight: 12 },
+    locationEmoji: { fontSize: 22 },
+    locationCoord: { fontSize: 13, color: t.textSecondary, marginVertical: 1, fontWeight: "500" },
+    autoTag: { backgroundColor: t.success + "22", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    autoTagText: { fontSize: 10, fontWeight: "700", color: t.success, textTransform: "uppercase" },
+    hint: { fontSize: 12, color: t.textMuted, marginTop: 8, fontStyle: "italic" },
+    footer: { flexDirection: "row", paddingHorizontal: 20, paddingTop: 16 },
+    cancelBtn: { flex: 1, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: t.background, marginRight: 10 },
+    cancelBtnText: { fontSize: 14, fontWeight: "700", color: t.textSecondary },
+    submitBtn: { flex: 2, paddingVertical: 14, borderRadius: 12, alignItems: "center", backgroundColor: t.primary },
+    submitBtnText: { fontSize: 14, fontWeight: "700", color: t.textInverse },
+  });
+};
 
 export default ReportModal;

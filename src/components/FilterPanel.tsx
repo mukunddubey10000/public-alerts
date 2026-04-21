@@ -6,9 +6,9 @@ import {
   TouchableOpacity,
   Modal,
   ScrollView,
-  Dimensions,
 } from "react-native";
 import { FilterOptions, Incident } from "../types";
+import { useTheme, Theme } from "../theme/ThemeContext";
 
 interface FilterPanelProps {
   visible: boolean;
@@ -23,9 +23,9 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   onFiltersChange,
   onClose,
 }) => {
+  const { theme } = useTheme();
   const [filters, setFilters] = useState<FilterOptions>(currentFilters);
 
-  // Sync local state when panel reopens with new external filters
   React.useEffect(() => {
     if (visible) {
       setFilters(currentFilters);
@@ -60,143 +60,115 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   };
 
   const handleReset = () => {
-    const defaultFilters: FilterOptions = {
+    setFilters({
       types: ["ACCIDENT", "OUTAGE", "CONSTRUCTION", "HAZARD"],
       radiusKm: 5,
       sortBy: "distance",
-    };
-    setFilters(defaultFilters);
+    });
   };
 
+  const s = createThemedStyles(theme);
+  const t = theme.colors;
+
   return (
-    <Modal
-      visible={visible}
-      animationType="fade"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.overlay}>
-        <View style={styles.panel}>
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <View style={s.overlay}>
+        <View style={s.panel}>
+          {/* Handle bar */}
+          <View style={s.handleRow}>
+            <View style={s.handle} />
+          </View>
+
           {/* Header */}
-          <View style={styles.header}>
-            <Text style={styles.title}>Filter Incidents</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Text style={styles.closeButton}>✕</Text>
+          <View style={s.header}>
+            <View>
+              <Text style={s.title}>Filters</Text>
+              <Text style={s.subtitle}>Customize your feed</Text>
+            </View>
+            <TouchableOpacity style={s.closeBtn} onPress={onClose}>
+              <Text style={s.closeBtnText}>✕</Text>
             </TouchableOpacity>
           </View>
 
-          <ScrollView style={styles.content}>
-            {/* Incident Type Filter */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Incident Type</Text>
-              <View style={styles.typeCheckboxes}>
-                {incidentTypes.map((type) => (
+          <ScrollView style={s.content} showsVerticalScrollIndicator={false}>
+            {/* Incident Type */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Incident Type</Text>
+              {incidentTypes.map((type) => {
+                const checked = filters.types.includes(type);
+                return (
                   <TouchableOpacity
                     key={type}
-                    style={styles.checkboxRow}
+                    style={s.checkboxRow}
                     onPress={() => toggleType(type)}
+                    activeOpacity={0.7}
                   >
-                    <View
-                      style={[
-                        styles.checkbox,
-                        filters.types.includes(type) && styles.checkboxChecked,
-                      ]}
-                    >
-                      {filters.types.includes(type) && (
-                        <Text style={styles.checkmark}>✓</Text>
-                      )}
+                    <View style={[s.checkbox, checked && { backgroundColor: t.primary, borderColor: t.primary }]}>
+                      {checked && <Text style={s.checkmark}>✓</Text>}
                     </View>
-                    <Text style={styles.checkboxLabel}>{type}</Text>
-                    <Text style={styles.typeEmoji}>
-                      {getIncidentEmoji(type)}
-                    </Text>
+                    <Text style={s.checkboxLabel}>{type}</Text>
+                    <Text style={s.typeEmoji}>{getEmoji(type)}</Text>
                   </TouchableOpacity>
-                ))}
+                );
+              })}
+            </View>
+
+            {/* Radius */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Search Radius</Text>
+              <View style={s.radiusRow}>
+                {radiusOptions.map((r) => {
+                  const sel = filters.radiusKm === r;
+                  return (
+                    <TouchableOpacity
+                      key={r}
+                      style={[s.radiusBtn, sel && { backgroundColor: t.primary, borderColor: t.primary }]}
+                      onPress={() => setFilters((p) => ({ ...p, radiusKm: r }))}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={[s.radiusBtnText, sel && { color: t.textInverse }]}>{r} km</Text>
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
 
-            {/* Radius Filter */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Search Radius</Text>
-              <View style={styles.radiusOptions}>
-                {radiusOptions.map((radius) => (
+            {/* Sort */}
+            <View style={s.section}>
+              <Text style={s.sectionTitle}>Sort By</Text>
+              {sortOptions.map((opt) => {
+                const sel = filters.sortBy === opt;
+                return (
                   <TouchableOpacity
-                    key={radius}
-                    style={[
-                      styles.radiusButton,
-                      filters.radiusKm === radius &&
-                        styles.radiusButtonSelected,
-                    ]}
-                    onPress={() =>
-                      setFilters((prev) => ({ ...prev, radiusKm: radius }))
-                    }
+                    key={opt}
+                    style={s.radioRow}
+                    onPress={() => setFilters((p) => ({ ...p, sortBy: opt }))}
+                    activeOpacity={0.7}
                   >
-                    <Text
-                      style={[
-                        styles.radiusButtonText,
-                        filters.radiusKm === radius &&
-                          styles.radiusButtonTextSelected,
-                      ]}
-                    >
-                      {radius} km
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            {/* Sort Options */}
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Sort By</Text>
-              <View style={styles.sortOptions}>
-                {sortOptions.map((option) => (
-                  <TouchableOpacity
-                    key={option}
-                    style={styles.sortRow}
-                    onPress={() =>
-                      setFilters((prev) => ({ ...prev, sortBy: option }))
-                    }
-                  >
-                    <View
-                      style={[
-                        styles.radio,
-                        filters.sortBy === option && styles.radioSelected,
-                      ]}
-                    >
-                      {filters.sortBy === option && (
-                        <View style={styles.radioDot} />
-                      )}
+                    <View style={[s.radio, sel && { borderColor: t.primary }]}>
+                      {sel && <View style={[s.radioDot, { backgroundColor: t.primary }]} />}
                     </View>
-                    <Text style={styles.sortLabel}>
-                      {option.charAt(0).toUpperCase() + option.slice(1)}
-                    </Text>
+                    <Text style={s.radioLabel}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</Text>
                   </TouchableOpacity>
-                ))}
-              </View>
+                );
+              })}
             </View>
 
-            {/* Info */}
-            <View style={styles.info}>
-              <Text style={styles.infoText}>
-                Currently showing {filters.types.length} incident type(s) within{" "}
-                {filters.radiusKm} km, sorted by {filters.sortBy}
+            {/* Summary */}
+            <View style={s.infoBox}>
+              <Text style={s.infoText}>
+                Showing {filters.types.length} type(s) within {filters.radiusKm} km, sorted by {filters.sortBy}
               </Text>
             </View>
           </ScrollView>
 
           {/* Footer */}
-          <View style={styles.footer}>
-            <TouchableOpacity
-              style={[styles.button, styles.resetButton]}
-              onPress={handleReset}
-            >
-              <Text style={styles.resetButtonText}>Reset</Text>
+          <View style={s.footer}>
+            <TouchableOpacity style={s.resetBtn} onPress={handleReset} activeOpacity={0.7}>
+              <Text style={s.resetBtnText}>Reset</Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.button, styles.applyButton]}
-              onPress={handleApply}
-            >
-              <Text style={styles.applyButtonText}>Apply Filters</Text>
+            <TouchableOpacity style={s.applyBtn} onPress={handleApply} activeOpacity={0.85}>
+              <Text style={s.applyBtnText}>Apply Filters</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -205,203 +177,51 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   );
 };
 
-const getIncidentEmoji = (type: Incident["type"]): string => {
+const getEmoji = (type: Incident["type"]): string => {
   switch (type) {
-    case "ACCIDENT":
-      return "🚗";
-    case "OUTAGE":
-      return "⚡";
-    case "CONSTRUCTION":
-      return "🏗️";
-    case "HAZARD":
-      return "⚠️";
-    default:
-      return "📍";
+    case "ACCIDENT": return "🚗";
+    case "OUTAGE": return "⚡";
+    case "CONSTRUCTION": return "🏗️";
+    case "HAZARD": return "⚠️";
+    default: return "📍";
   }
 };
 
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  panel: {
-    width: "85%",
-    maxHeight: "80%",
-    backgroundColor: "#fff",
-    borderRadius: 15,
-    overflow: "hidden",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    backgroundColor: "#f9f9f9",
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  closeButton: {
-    fontSize: 22,
-    color: "#999",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-  },
-  section: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 10,
-    textTransform: "uppercase",
-  },
-  typeCheckboxes: {},
-  checkboxRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: "#ddd",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  checkboxChecked: {
-    backgroundColor: "#2196F3",
-    borderColor: "#2196F3",
-  },
-  checkmark: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "bold",
-  },
-  checkboxLabel: {
-    flex: 1,
-    fontSize: 13,
-    color: "#333",
-    fontWeight: "500",
-  },
-  typeEmoji: {
-    fontSize: 16,
-  },
-  radiusOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    marginHorizontal: -5,
-  },
-  radiusButton: {
-    flex: 1,
-    minWidth: "22%",
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    marginHorizontal: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#ddd",
-    alignItems: "center",
-  },
-  radiusButtonSelected: {
-    backgroundColor: "#2196F3",
-    borderColor: "#2196F3",
-  },
-  radiusButtonText: {
-    fontSize: 12,
-    color: "#333",
-    fontWeight: "600",
-  },
-  radiusButtonTextSelected: {
-    color: "#fff",
-  },
-  sortOptions: {},
-  sortRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 8,
-    marginBottom: 4,
-  },
-  radio: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: "#ddd",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 10,
-  },
-  radioSelected: {
-    borderColor: "#2196F3",
-  },
-  radioDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: "#2196F3",
-  },
-  sortLabel: {
-    fontSize: 13,
-    color: "#333",
-    fontWeight: "500",
-  },
-  info: {
-    backgroundColor: "#E3F2FD",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    marginTop: 10,
-  },
-  infoText: {
-    fontSize: 12,
-    color: "#1565C0",
-    lineHeight: 16,
-  },
-  footer: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingVertical: 15,
-    borderTopWidth: 1,
-    borderTopColor: "#eee",
-  },
-  button: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: "center",
-    marginHorizontal: 5,
-  },
-  resetButton: {
-    backgroundColor: "#f5f5f5",
-  },
-  resetButtonText: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#666",
-  },
-  applyButton: {
-    backgroundColor: "#2196F3",
-  },
-  applyButtonText: {
-    fontSize: 13,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-});
+const createThemedStyles = (theme: Theme) => {
+  const t = theme.colors;
+  return StyleSheet.create({
+    overlay: { flex: 1, backgroundColor: t.overlay, justifyContent: "center", alignItems: "center" },
+    panel: { width: "88%", maxHeight: "82%", backgroundColor: t.surface, borderRadius: 24, overflow: "hidden" },
+    handleRow: { alignItems: "center", paddingTop: 12, paddingBottom: 4 },
+    handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: t.border },
+    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.separator },
+    title: { fontSize: 18, fontWeight: "800", color: t.text },
+    subtitle: { fontSize: 12, color: t.textMuted, marginTop: 2 },
+    closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: t.background, justifyContent: "center", alignItems: "center" },
+    closeBtnText: { fontSize: 16, color: t.textSecondary },
+    content: { paddingHorizontal: 20, paddingVertical: 16 },
+    section: { marginBottom: 22 },
+    sectionTitle: { fontSize: 12, fontWeight: "700", color: t.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.8 },
+    checkboxRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: t.background, marginBottom: 6 },
+    checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: t.border, justifyContent: "center", alignItems: "center", marginRight: 12 },
+    checkmark: { color: "#fff", fontSize: 13, fontWeight: "bold" },
+    checkboxLabel: { flex: 1, fontSize: 14, color: t.text, fontWeight: "600" },
+    typeEmoji: { fontSize: 18 },
+    radiusRow: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
+    radiusBtn: { flex: 1, minWidth: "20%", paddingVertical: 10, marginHorizontal: 4, borderRadius: 10, borderWidth: 1.5, borderColor: t.border, alignItems: "center", backgroundColor: t.background },
+    radiusBtnText: { fontSize: 13, color: t.text, fontWeight: "700" },
+    radioRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: t.background, marginBottom: 6 },
+    radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: t.border, justifyContent: "center", alignItems: "center", marginRight: 12 },
+    radioDot: { width: 10, height: 10, borderRadius: 5 },
+    radioLabel: { fontSize: 14, color: t.text, fontWeight: "600" },
+    infoBox: { backgroundColor: t.primary + "15", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, marginTop: 4 },
+    infoText: { fontSize: 12, color: t.primary, lineHeight: 18, fontWeight: "500" },
+    footer: { flexDirection: "row", paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.separator },
+    resetBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", marginRight: 8, backgroundColor: t.background },
+    resetBtnText: { fontSize: 14, fontWeight: "700", color: t.textSecondary },
+    applyBtn: { flex: 2, paddingVertical: 12, borderRadius: 10, alignItems: "center", backgroundColor: t.primary },
+    applyBtnText: { fontSize: 14, fontWeight: "700", color: t.textInverse },
+  });
+};
 
 export default FilterPanel;

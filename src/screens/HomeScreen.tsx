@@ -7,6 +7,7 @@ import {
   Alert,
   Modal,
   ScrollView,
+  StatusBar,
 } from "react-native";
 import { getDistanceKm } from "../utils/geo";
 import MapView from "../components/MapView";
@@ -25,8 +26,10 @@ import {
   upvoteIncident,
   getTrendingIncidents,
 } from "../services/mockData";
+import { useTheme, Theme } from "../theme/ThemeContext";
 
 const HomeScreen = () => {
+  const { theme, isDark, toggleTheme } = useTheme();
   const {
     location,
     isLoading: locationLoading,
@@ -49,11 +52,9 @@ const HomeScreen = () => {
     sortBy: "distance",
   });
 
-  // Fetch incidents based on filters
   const [incidents, setIncidents] = useState<Incident[]>([]);
 
   useEffect(() => {
-    // Simulate fetching incidents
     const timer = setTimeout(() => {
       let filtered = getNearbyIncidents(location, filters.radiusKm);
       filtered = filtered.filter((i) => filters.types.includes(i.type));
@@ -104,56 +105,78 @@ const HomeScreen = () => {
     return getTrendingIncidents(location, filters.radiusKm).length;
   };
 
+  const s = createThemedStyles(theme);
+
   return (
-    <View style={styles.container}>
-      {/* Top Control Bar */}
-      <View style={styles.topBar}>
-        <View style={styles.titleSection}>
-          <Text style={styles.appTitle}>🚨 CivicAlerts</Text>
-          <Text style={styles.appSubtitle}>Real-time incidents near you</Text>
+    <View style={s.container}>
+      <StatusBar
+        barStyle={isDark ? "light-content" : "dark-content"}
+        backgroundColor={theme.colors.surface}
+      />
+
+      {/* Header */}
+      <View style={s.header}>
+        <View style={s.headerLeft}>
+          <View style={s.logoContainer}>
+            <Text style={s.logoIcon}>⚡</Text>
+          </View>
+          <View>
+            <Text style={s.appTitle}>AlertX</Text>
+            <Text style={s.appSubtitle}>Live incidents near you</Text>
+          </View>
         </View>
 
-        <View style={styles.topRightButtons}>
-          {/* Notifications Button */}
+        <View style={s.headerRight}>
           <TouchableOpacity
-            style={styles.notificationButton}
-            onPress={() => setNotificationsPanelVisible(true)}
+            style={s.headerBtn}
+            onPress={toggleTheme}
+            activeOpacity={0.7}
           >
-            <Text style={styles.notificationIcon}>🔔</Text>
+            <Text style={s.headerBtnIcon}>{isDark ? "☀️" : "🌙"}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={s.headerBtn}
+            onPress={() => setNotificationsPanelVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={s.headerBtnIcon}>🔔</Text>
             {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
+              <View style={s.badge}>
+                <Text style={s.badgeText}>
                   {unreadCount > 9 ? "9+" : unreadCount}
                 </Text>
               </View>
             )}
           </TouchableOpacity>
 
-          {/* Filter Button */}
           <TouchableOpacity
-            style={styles.filterButton}
+            style={s.headerBtn}
             onPress={() => setFilterPanelVisible(true)}
+            activeOpacity={0.7}
           >
-            <Text style={styles.filterIcon}>⚙️</Text>
+            <Text style={s.headerBtnIcon}>⚙️</Text>
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Main Map View */}
+      {/* Main Content */}
       {locationLoading ? (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingEmoji}>📍</Text>
-          <Text style={styles.loadingText}>Fetching your location...</Text>
-          <Text style={styles.loadingSubtext}>
+        <View style={s.loadingContainer}>
+          <View style={s.loadingPulse}>
+            <Text style={s.loadingIcon}>📍</Text>
+          </View>
+          <Text style={s.loadingTitle}>Finding your location...</Text>
+          <Text style={s.loadingSub}>
             Please allow location access when prompted
           </Text>
         </View>
       ) : (
         <View style={{ flex: 1 }}>
           {locationError && (
-            <View style={styles.locationErrorBanner}>
-              <Text style={styles.locationErrorText}>
-                ⚠️ Using approximate location: {locationError}
+            <View style={s.errorBanner}>
+              <Text style={s.errorBannerText}>
+                ⚠️ Approximate location · {locationError}
               </Text>
             </View>
           )}
@@ -161,26 +184,19 @@ const HomeScreen = () => {
             userLocation={location}
             incidents={incidents}
             radiusKm={filters.radiusKm}
+            isDark={isDark}
             onIncidentPress={handleIncidentPress}
             onMarkerPress={handleIncidentPress}
           />
         </View>
       )}
 
-      {/* Floating Action Buttons */}
-      <View style={styles.fab}>
-        {/* Report Button */}
-        <TouchableOpacity
-          style={[styles.fabButton, styles.reportButton]}
-          onPress={() => setReportModalVisible(true)}
-        >
-          <Text style={styles.fabButtonText}>+</Text>
-        </TouchableOpacity>
-
-        {/* Trending Button */}
+      {/* FAB */}
+      <View style={s.fabContainer}>
         {getTrendingCount() > 0 && (
           <TouchableOpacity
-            style={[styles.fabButton, styles.trendingButton]}
+            style={s.fabTrending}
+            activeOpacity={0.85}
             onPress={() => {
               const trending = getTrendingIncidents(location, filters.radiusKm);
               Alert.alert(
@@ -194,39 +210,40 @@ const HomeScreen = () => {
               );
             }}
           >
-            <Text style={styles.trendingBadgeText}>
-              🔥 {getTrendingCount()}
-            </Text>
+            <Text style={s.fabTrendingText}>🔥 {getTrendingCount()}</Text>
           </TouchableOpacity>
         )}
+
+        <TouchableOpacity
+          style={s.fabMain}
+          activeOpacity={0.85}
+          onPress={() => setReportModalVisible(true)}
+        >
+          <Text style={s.fabMainIcon}>+</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Incident Detail Modal */}
+      {/* Modals */}
       <IncidentDetailModal
         visible={incidentDetailVisible && selectedIncident !== null}
         incident={selectedIncident}
         userLocation={location}
         onClose={handleDetailClose}
         onUpvote={handleUpvote}
+        theme={theme}
       />
-
-      {/* Report Modal */}
       <ReportModal
         visible={reportModalVisible}
         userLocation={location}
         onClose={() => setReportModalVisible(false)}
         onSubmit={handleReportSubmit}
       />
-
-      {/* Filter Panel */}
       <FilterPanel
         visible={filterPanelVisible}
         currentFilters={filters}
         onFiltersChange={setFilters}
         onClose={() => setFilterPanelVisible(false)}
       />
-
-      {/* Notifications Panel */}
       <NotificationsPanel
         visible={notificationsPanelVisible}
         notifications={notifications}
@@ -239,15 +256,14 @@ const HomeScreen = () => {
   );
 };
 
-/**
- * Incident Detail Modal
- */
+/* ── Incident Detail Modal ─────────────── */
 interface IncidentDetailModalProps {
   visible: boolean;
   incident: Incident | null;
   userLocation: Location;
   onClose: () => void;
   onUpvote: () => void;
+  theme: Theme;
 }
 
 const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
@@ -256,98 +272,60 @@ const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
   userLocation,
   onClose,
   onUpvote,
+  theme,
 }) => {
   if (!incident) return null;
 
   const distance = getDistanceKm(userLocation, incident.location);
   const timeAgo = getTimeAgo(incident.createdAt);
+  const t = theme.colors;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent={true}
-      onRequestClose={onClose}
-    >
-      <View style={styles.detailOverlay}>
-        <View style={styles.detailModal}>
-          <TouchableOpacity style={styles.detailClose} onPress={onClose}>
-            <Text style={styles.detailCloseText}>✕</Text>
-          </TouchableOpacity>
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: t.overlay, justifyContent: "flex-end" }}>
+        <View style={{ backgroundColor: t.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 24, paddingTop: 14, paddingBottom: 28, maxHeight: "82%" }}>
+          <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: t.border, alignSelf: "center", marginBottom: 16 }} />
 
-          <ScrollView>
-            <View style={styles.detailContent}>
-              <Text style={styles.detailEmoji}>
-                {getIncidentEmoji(incident.type)}
-              </Text>
-
-              <Text style={styles.detailType}>{incident.type}</Text>
-              <Text style={styles.detailTime}>{timeAgo}</Text>
-
-              <View style={styles.detailMetrics}>
-                <View style={styles.metric}>
-                  <Text style={styles.metricLabel}>Distance</Text>
-                  <Text style={styles.metricValue}>
-                    {distance.toFixed(1)} km
-                  </Text>
-                </View>
-                <View style={styles.metric}>
-                  <Text style={styles.metricLabel}>Confirmations</Text>
-                  <Text style={styles.metricValue}>{incident.upvotes}</Text>
-                </View>
-                <View style={styles.metric}>
-                  <Text style={styles.metricLabel}>Status</Text>
-                  <Text
-                    style={[
-                      styles.metricValue,
-                      {
-                        color:
-                          incident.status === "ACTIVE" ? "#4CAF50" : "#999",
-                      },
-                    ]}
-                  >
-                    {incident.status}
-                  </Text>
-                </View>
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={{ alignItems: "center", marginBottom: 16 }}>
+              <View style={{ width: 72, height: 72, borderRadius: 36, backgroundColor: getIncidentColor(incident.type) + "22", justifyContent: "center", alignItems: "center", marginBottom: 12 }}>
+                <Text style={{ fontSize: 36 }}>{getIncidentEmoji(incident.type)}</Text>
               </View>
+              <Text style={{ fontSize: 22, fontWeight: "800", color: t.text, letterSpacing: 0.5 }}>{incident.type}</Text>
+              <Text style={{ fontSize: 13, color: t.textMuted, marginTop: 4 }}>{timeAgo}</Text>
+            </View>
 
-              <Text style={styles.detailDescription}>
-                {incident.description}
-              </Text>
+            <View style={{ flexDirection: "row", backgroundColor: t.background, borderRadius: 16, paddingVertical: 14, marginBottom: 20 }}>
+              {[
+                { label: "Distance", value: distance.toFixed(1) + " km" },
+                { label: "Confirms", value: String(incident.upvotes) },
+                { label: "Status", value: incident.status, color: incident.status === "ACTIVE" ? t.success : t.textMuted },
+              ].map((m, i) => (
+                <View key={i} style={{ flex: 1, alignItems: "center" }}>
+                  <Text style={{ fontSize: 10, color: t.textMuted, marginBottom: 4, textTransform: "uppercase", letterSpacing: 0.5 }}>{m.label}</Text>
+                  <Text style={{ fontSize: 17, fontWeight: "700", color: m.color || t.text }}>{m.value}</Text>
+                </View>
+              ))}
+            </View>
 
-              <View style={styles.detailActions}>
-                <TouchableOpacity
-                  style={styles.detailActionButton}
-                  onPress={onUpvote}
-                >
-                  <Text style={styles.detailActionEmoji}>👍</Text>
-                  <Text style={styles.detailActionText}>Confirm</Text>
+            <Text style={{ fontSize: 15, color: t.textSecondary, lineHeight: 22, textAlign: "center", marginBottom: 24 }}>{incident.description}</Text>
+
+            <View style={{ flexDirection: "row", marginBottom: 16 }}>
+              {[
+                { emoji: "👍", label: "Confirm", action: onUpvote },
+                { emoji: "📤", label: "Share", action: () => Alert.alert("", "Share feature coming soon!") },
+                { emoji: "🚩", label: "Report", action: () => Alert.alert("", "Report abuse feature coming soon!") },
+              ].map((a, i) => (
+                <TouchableOpacity key={i} style={{ flex: 1, alignItems: "center", paddingVertical: 14, marginHorizontal: 4, borderRadius: 12, backgroundColor: theme.dark ? t.surfaceElevated : t.primary + "12" }} activeOpacity={0.7} onPress={a.action}>
+                  <Text style={{ fontSize: 22, marginBottom: 4 }}>{a.emoji}</Text>
+                  <Text style={{ fontSize: 12, fontWeight: "600", color: t.primary }}>{a.label}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.detailActionButton}
-                  onPress={() => Alert.alert("", "Share feature coming soon!")}
-                >
-                  <Text style={styles.detailActionEmoji}>📤</Text>
-                  <Text style={styles.detailActionText}>Share</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.detailActionButton}
-                  onPress={() =>
-                    Alert.alert("", "Report abuse feature coming soon!")
-                  }
-                >
-                  <Text style={styles.detailActionEmoji}>🚩</Text>
-                  <Text style={styles.detailActionText}>Report</Text>
-                </TouchableOpacity>
-              </View>
+              ))}
             </View>
           </ScrollView>
 
-          <TouchableOpacity
-            style={styles.detailCloseButtonBottom}
-            onPress={onClose}
-          >
-            <Text style={styles.detailCloseButtonText}>Close</Text>
+          <TouchableOpacity style={{ backgroundColor: t.primary, paddingVertical: 14, borderRadius: 12, alignItems: "center" }} activeOpacity={0.85} onPress={onClose}>
+            <Text style={{ fontSize: 15, fontWeight: "700", color: t.textInverse }}>Close</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -355,270 +333,67 @@ const IncidentDetailModal: React.FC<IncidentDetailModalProps> = ({
   );
 };
 
-// Helper functions
+/* ── Helpers ─────────────── */
 const getIncidentEmoji = (type: Incident["type"]): string => {
   switch (type) {
-    case "ACCIDENT":
-      return "🚗";
-    case "OUTAGE":
-      return "⚡";
-    case "CONSTRUCTION":
-      return "🏗️";
-    case "HAZARD":
-      return "⚠️";
-    default:
-      return "📍";
+    case "ACCIDENT": return "🚗";
+    case "OUTAGE": return "⚡";
+    case "CONSTRUCTION": return "🏗️";
+    case "HAZARD": return "⚠️";
+    default: return "📍";
+  }
+};
+
+const getIncidentColor = (type: Incident["type"]): string => {
+  switch (type) {
+    case "ACCIDENT": return "#FF6B6B";
+    case "OUTAGE": return "#FECA57";
+    case "CONSTRUCTION": return "#FF9F43";
+    case "HAZARD": return "#EE5A24";
+    default: return "#6C5CE7";
   }
 };
 
 const getTimeAgo = (timestamp: number): string => {
-  const now = Date.now();
-  const diff = now - timestamp;
+  const diff = Date.now() - timestamp;
   const minutes = Math.floor(diff / 60000);
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
-
   if (minutes < 1) return "just now";
   if (minutes < 60) return `${minutes}m ago`;
   if (hours < 24) return `${hours}h ago`;
   return `${days}d ago`;
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#f5f5f5",
-  },
-  topBar: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-    borderBottomWidth: 1,
-    borderBottomColor: "#eee",
-    paddingTop: 12,
-  },
-  titleSection: {
-    flex: 1,
-  },
-  appTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#FF5252",
-  },
-  appSubtitle: {
-    fontSize: 11,
-    color: "#999",
-    marginTop: 2,
-  },
-  topRightButtons: {
-    flexDirection: "row",
-  },
-  notificationButton: {
-    position: "relative",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    marginRight: 10,
-  },
-  notificationIcon: {
-    fontSize: 24,
-  },
-  notificationBadge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: "#FF5252",
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  notificationBadgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "bold",
-  },
-  filterButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-  },
-  filterIcon: {
-    fontSize: 22,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#f5f5f5",
-  },
-  loadingEmoji: {
-    fontSize: 40,
-    marginBottom: 12,
-  },
-  loadingText: {
-    fontSize: 16,
-    color: "#333",
-    fontWeight: "600",
-  },
-  loadingSubtext: {
-    fontSize: 12,
-    color: "#999",
-    marginTop: 6,
-  },
-  locationErrorBanner: {
-    backgroundColor: "#FFF3E0",
-    paddingVertical: 6,
-    paddingHorizontal: 15,
-    borderBottomWidth: 1,
-    borderBottomColor: "#FFE0B2",
-  },
-  locationErrorText: {
-    fontSize: 11,
-    color: "#E65100",
-    textAlign: "center",
-  },
-  fab: {
-    position: "absolute",
-    bottom: 20,
-    right: 20,
-  },
-  fabButton: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginTop: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  reportButton: {
-    backgroundColor: "#2196F3",
-  },
-  fabButtonText: {
-    fontSize: 32,
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  trendingButton: {
-    backgroundColor: "#FF9800",
-    paddingHorizontal: 8,
-    width: "auto",
-    paddingVertical: 8,
-  },
-  trendingBadgeText: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-  detailOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  detailModal: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    maxHeight: "80%",
-  },
-  detailClose: {
-    alignItems: "flex-end",
-    marginBottom: 15,
-  },
-  detailCloseText: {
-    fontSize: 28,
-    color: "#999",
-  },
-  detailContent: {
-    alignItems: "center",
-  },
-  detailEmoji: {
-    fontSize: 48,
-    marginBottom: 10,
-  },
-  detailType: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#333",
-    marginBottom: 5,
-  },
-  detailTime: {
-    fontSize: 12,
-    color: "#999",
-    marginBottom: 15,
-  },
-  detailMetrics: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    backgroundColor: "#f5f5f5",
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-  },
-  metric: {
-    alignItems: "center",
-  },
-  metricLabel: {
-    fontSize: 11,
-    color: "#999",
-    marginBottom: 4,
-  },
-  metricValue: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  detailDescription: {
-    fontSize: 14,
-    color: "#555",
-    marginBottom: 15,
-    lineHeight: 20,
-    textAlign: "center",
-  },
-  detailActions: {
-    flexDirection: "row",
-    justifyContent: "space-around",
-    width: "100%",
-    marginBottom: 15,
-  },
-  detailActionButton: {
-    alignItems: "center",
-    flex: 1,
-    paddingVertical: 10,
-    marginHorizontal: 5,
-    borderRadius: 8,
-    backgroundColor: "#E3F2FD",
-  },
-  detailActionEmoji: {
-    fontSize: 24,
-    marginBottom: 3,
-  },
-  detailActionText: {
-    fontSize: 12,
-    color: "#1565C0",
-    fontWeight: "600",
-  },
-  detailCloseButtonBottom: {
-    backgroundColor: "#2196F3",
-    paddingVertical: 12,
-    borderRadius: 8,
-    alignItems: "center",
-  },
-  detailCloseButtonText: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#fff",
-  },
-});
+/* ── Themed Styles ─────────────── */
+const createThemedStyles = (theme: Theme) => {
+  const t = theme.colors;
+  return StyleSheet.create({
+    container: { flex: 1, backgroundColor: t.background },
+    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingVertical: 10, backgroundColor: t.surface, borderBottomWidth: 1, borderBottomColor: t.separator },
+    headerLeft: { flexDirection: "row", alignItems: "center" },
+    logoContainer: { width: 38, height: 38, borderRadius: 12, backgroundColor: t.primary, justifyContent: "center", alignItems: "center", marginRight: 10 },
+    logoIcon: { fontSize: 20 },
+    appTitle: { fontSize: 20, fontWeight: "800", color: t.text, letterSpacing: 0.5 },
+    appSubtitle: { fontSize: 11, color: t.textMuted, marginTop: 1 },
+    headerRight: { flexDirection: "row", alignItems: "center" },
+    headerBtn: { width: 40, height: 40, borderRadius: 20, backgroundColor: t.background, justifyContent: "center", alignItems: "center", marginLeft: 8 },
+    headerBtnIcon: { fontSize: 18 },
+    badge: { position: "absolute", top: -2, right: -2, backgroundColor: t.badgeBg, minWidth: 18, height: 18, borderRadius: 9, justifyContent: "center", alignItems: "center", paddingHorizontal: 4, borderWidth: 2, borderColor: t.surface },
+    badgeText: { color: "#fff", fontSize: 9, fontWeight: "bold" },
+    loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: t.background },
+    loadingPulse: { width: 80, height: 80, borderRadius: 40, backgroundColor: t.primary + "20", justifyContent: "center", alignItems: "center", marginBottom: 20 },
+    loadingIcon: { fontSize: 36 },
+    loadingTitle: { fontSize: 17, color: t.text, fontWeight: "700" },
+    loadingSub: { fontSize: 13, color: t.textMuted, marginTop: 6 },
+    errorBanner: { backgroundColor: theme.dark ? "#2D1B00" : "#FFF3E0", paddingVertical: 6, paddingHorizontal: 16, borderBottomWidth: 1, borderBottomColor: theme.dark ? "#5C3600" : "#FFE0B2" },
+    errorBannerText: { fontSize: 11, color: theme.dark ? "#FECA57" : "#E65100", textAlign: "center" },
+    fabContainer: { position: "absolute", bottom: 24, right: 20, alignItems: "center" },
+    fabTrending: { backgroundColor: t.warning, paddingHorizontal: 16, paddingVertical: 10, borderRadius: 999, marginBottom: 12, shadowColor: t.warning, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 8, elevation: 6 },
+    fabTrendingText: { fontSize: 13, fontWeight: "700", color: "#1A1A2E" },
+    fabMain: { width: 60, height: 60, borderRadius: 30, backgroundColor: t.primary, justifyContent: "center", alignItems: "center", shadowColor: t.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 10, elevation: 8 },
+    fabMainIcon: { fontSize: 30, color: "#fff", fontWeight: "300", marginTop: -2 },
+  });
+};
 
 export default HomeScreen;
