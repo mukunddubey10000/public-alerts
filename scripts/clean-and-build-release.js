@@ -39,7 +39,11 @@ if (!fs.existsSync(LOG_DIR)) {
 }
 
 function appendLog(text) {
-  fs.appendFileSync(ERROR_LOG, text, { mode: 0o666 });
+  try {
+    fs.appendFileSync(ERROR_LOG, text, { mode: 0o666 });
+  } catch (_) {
+    console.error("Warning: could not write to log file: " + ERROR_LOG);
+  }
 }
 
 function log(msg) {
@@ -55,20 +59,18 @@ function run(cmd, cwd) {
   try {
     childProcess.execSync(cmd, {
       cwd: cwd || PROJECT_ROOT,
-      stdio: ["inherit", "pipe", "pipe"],
+      stdio: "inherit",
       env: Object.assign({}, process.env),
     });
   } catch (err) {
-    var output = "";
-    if (err.stdout) output += err.stdout.toString();
-    if (err.stderr) output += err.stderr.toString();
-
-    // Log the command and output to the error log
+    // Log the command and error details to the error log
     appendLog("COMMAND: " + cmd + "\n");
-    appendLog("ERROR MESSAGE:\n" + output + "\n");
+    appendLog("EXIT CODE: " + (err.status != null ? err.status : "unknown") + "\n");
+    if (err.stdout) appendLog("STDOUT:\n" + err.stdout.toString() + "\n");
+    if (err.stderr) appendLog("STDERR:\n" + err.stderr.toString() + "\n");
+    appendLog("ERROR: " + (err.message || String(err)) + "\n");
     appendLog("========================================\n\n");
 
-    console.error(output);
     throw err;
   }
 }
@@ -137,13 +139,15 @@ try {
   console.log("APK location: " + APK_OUTPUT);
   console.log("");
 } catch (err) {
-  // On failure, display failure message
+  // Ensure error details are written to log even if run() didn't log them
+  appendLog("FATAL: " + (err.message || String(err)) + "\n");
+  if (err.stack) appendLog(err.stack + "\n");
+
   console.log("");
   console.log("========================================");
   console.log("  BUILD FAILED");
   console.log("  Error log saved to: " + ERROR_LOG);
   console.log("========================================");
 
-  // Re-throw the error to stop the process and return failure code
   process.exit(1);
 }
