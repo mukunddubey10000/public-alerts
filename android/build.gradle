@@ -19,8 +19,15 @@ buildscript {
 
 allprojects {
     repositories {
-        maven {
-            url("$rootDir/../node_modules/react-native/android")
+        exclusiveContent {
+            filter {
+                includeGroup "com.facebook.react"
+            }
+            forRepository {
+                maven {
+                    url("$rootDir/../node_modules/react-native/android")
+                }
+            }
         }
         maven {
             url("$rootDir/../node_modules/jsc-android/dist")

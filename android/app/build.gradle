@@ -1,6 +1,10 @@
 apply plugin: "com.android.application"
 apply plugin: "com.facebook.react"
 
+react {
+    // JS bundle is created for release builds automatically
+}
+
 def enableSeparateBuildPerCPUArchitecture = false
 
 def enableProguardInReleaseBuilds = false
@@ -64,8 +68,11 @@ android {
 }
 
 dependencies {
+    // The version of react-native is set by the React Native Gradle Plugin
+    implementation("com.facebook.react:react-native:+")
+
     if (hermesEnabled.toBoolean()) {
-        implementation("com.facebook.react:hermes-engine")
+        implementation("com.facebook.react:hermes-engine:+")
     } else {
         implementation jscFlavor
     }
