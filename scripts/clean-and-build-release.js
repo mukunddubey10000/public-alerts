@@ -16,8 +16,8 @@ var LOG_DIR = path.join(PROJECT_ROOT, "build-logs"); // Log folder
 
 var TIMESTAMP = new Date()
   .toISOString()
-  .replace(/[:\-T]/g, "")
-  .slice(0, 15);
+  .replace(/[:\-T.]/g, "")
+  .slice(0, 14);
 var ERROR_LOG = path.join(LOG_DIR, "build-error-" + TIMESTAMP + ".txt");
 
 var IS_WIN = process.platform === "win32";
