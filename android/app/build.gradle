@@ -1,9 +1,9 @@
 apply plugin: "com.android.application"
-apply plugin: "com.facebook.react"
 
-react {
-    // JS bundle is created for release builds automatically
-}
+// Use the legacy react.gradle script instead of "com.facebook.react" plugin.
+// The plugin runs codegen that generates duplicate classes already present in
+// the react-native AAR, causing mergeDexRelease failures on old architecture.
+apply from: "../../node_modules/react-native/react.gradle"
 
 def enableSeparateBuildPerCPUArchitecture = false
 
@@ -75,23 +75,6 @@ dependencies {
         implementation("com.facebook.react:hermes-engine:0.70.6")
     } else {
         implementation jscFlavor
-    }
-}
-
-// RN 0.70 codegen generates Java sources that duplicate classes already in the
-// react-native AAR, causing mergeDexRelease to fail.  Remove the generated
-// duplicates right before compilation so only the AAR copies survive.
-gradle.projectsEvaluated {
-    tasks.matching { it.name.matches(/compile.*JavaWithJavac/) }.each { compileTask ->
-        compileTask.doFirst {
-            def codegenDir = file("${buildDir}/generated/source/codegen/java")
-            if (codegenDir.exists()) {
-                fileTree(codegenDir).matching {
-                    include '**/react/viewmanagers/**'
-                    include '**/fbreact/specs/**'
-                }.each { it.delete() }
-            }
-        }
     }
 }
 
