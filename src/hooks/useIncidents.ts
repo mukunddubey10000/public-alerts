@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { Platform, PermissionsAndroid, Alert, Linking } from 'react-native';
-import Geolocation from 'react-native-geolocation-service';
-import { Location, Incident, Notification } from '../types';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { Platform, PermissionsAndroid, Alert, Linking } from "react-native";
+import Geolocation from "react-native-geolocation-service";
+import { Location, Incident, Notification } from "../types";
 import {
   getCurrentUser,
   updateUserLocation,
@@ -10,7 +10,7 @@ import {
   markNotificationAsRead,
   sortIncidents,
   DEFAULT_USER_LOCATION,
-} from '../services/mockData';
+} from "../services/mockData";
 
 /**
  * Request location permission on Android
@@ -20,17 +20,17 @@ const requestAndroidPermission = async (): Promise<boolean> => {
     const fineGranted = await PermissionsAndroid.request(
       PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
       {
-        title: 'CivicAlerts Location Permission',
+        title: "CivicAlerts Location Permission",
         message:
-          'CivicAlerts needs access to your location to show nearby incidents and alerts.',
-        buttonNeutral: 'Ask Me Later',
-        buttonNegative: 'Cancel',
-        buttonPositive: 'OK',
+          "CivicAlerts needs access to your location to show nearby incidents and alerts.",
+        buttonNeutral: "Ask Me Later",
+        buttonNegative: "Cancel",
+        buttonPositive: "OK",
       },
     );
     return fineGranted === PermissionsAndroid.RESULTS.GRANTED;
   } catch (err) {
-    console.warn('Location permission error:', err);
+    console.warn("Location permission error:", err);
     return false;
   }
 };
@@ -39,7 +39,7 @@ const requestAndroidPermission = async (): Promise<boolean> => {
  * Request location permission (cross-platform)
  */
 const requestLocationPermission = async (): Promise<boolean> => {
-  if (Platform.OS === 'android') {
+  if (Platform.OS === "android") {
     return requestAndroidPermission();
   }
   // iOS: permissions handled via Info.plist, Geolocation triggers the prompt
@@ -63,14 +63,14 @@ export const useLocation = () => {
 
       if (!hasPermission) {
         if (mounted) {
-          setError('Location permission denied');
+          setError("Location permission denied");
           setIsLoading(false);
           Alert.alert(
-            'Location Required',
-            'CivicAlerts needs your location to show nearby incidents. Please enable location access in Settings.',
+            "Location Required",
+            "CivicAlerts needs your location to show nearby incidents. Please enable location access in Settings.",
             [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => Linking.openSettings() },
+              { text: "Cancel", style: "cancel" },
+              { text: "Open Settings", onPress: () => Linking.openSettings() },
             ],
           );
         }
@@ -92,7 +92,7 @@ export const useLocation = () => {
           }
         },
         (err) => {
-          console.warn('getCurrentPosition error:', err);
+          console.warn("getCurrentPosition error:", err);
           if (mounted) {
             // Fall back to default location
             setLocation(DEFAULT_USER_LOCATION);
@@ -122,7 +122,7 @@ export const useLocation = () => {
           }
         },
         (err) => {
-          console.warn('watchPosition error:', err);
+          console.warn("watchPosition error:", err);
           if (mounted) {
             setError(err.message);
           }
@@ -160,7 +160,7 @@ export const useLocation = () => {
 export const useNearbyIncidents = (
   userLocation: Location,
   radiusKm: number = 5,
-  sortBy: 'distance' | 'recent' | 'upvotes' = 'distance'
+  sortBy: "distance" | "recent" | "upvotes" = "distance",
 ) => {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -191,7 +191,7 @@ export const useNotifications = () => {
     const timer = setInterval(() => {
       const notifs = getNotifications();
       setNotifications(notifs);
-      setUnreadCount(notifs.filter(n => !n.read).length);
+      setUnreadCount(notifs.filter((n) => !n.read).length);
     }, 1000); // Poll every second for demo
 
     return () => clearInterval(timer);
@@ -199,10 +199,10 @@ export const useNotifications = () => {
 
   const markAsRead = useCallback((notificationId: string) => {
     markNotificationAsRead(notificationId);
-    setNotifications(prev =>
-      prev.map(n => (n.id === notificationId ? { ...n, read: true } : n))
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n)),
     );
-    setUnreadCount(prev => Math.max(0, prev - 1));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
   }, []);
 
   return { notifications, unreadCount, markAsRead };

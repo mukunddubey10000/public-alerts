@@ -26,21 +26,31 @@ const MAP_HEIGHT = height * 0.42;
 
 const getIncidentEmoji = (type: Incident["type"]): string => {
   switch (type) {
-    case "ACCIDENT": return "🚗";
-    case "OUTAGE": return "⚡";
-    case "CONSTRUCTION": return "🏗️";
-    case "HAZARD": return "⚠️";
-    default: return "📍";
+    case "ACCIDENT":
+      return "🚗";
+    case "OUTAGE":
+      return "⚡";
+    case "CONSTRUCTION":
+      return "🏗️";
+    case "HAZARD":
+      return "⚠️";
+    default:
+      return "📍";
   }
 };
 
 const getIncidentColor = (type: Incident["type"]): string => {
   switch (type) {
-    case "ACCIDENT": return "#FF6B6B";
-    case "OUTAGE": return "#FECA57";
-    case "CONSTRUCTION": return "#FF9F43";
-    case "HAZARD": return "#EE5A24";
-    default: return "#6C5CE7";
+    case "ACCIDENT":
+      return "#FF6B6B";
+    case "OUTAGE":
+      return "#FECA57";
+    case "CONSTRUCTION":
+      return "#FF9F43";
+    case "HAZARD":
+      return "#EE5A24";
+    default:
+      return "#6C5CE7";
   }
 };
 
@@ -179,7 +189,11 @@ const MapViewComponent: React.FC<MapViewProps> = ({
 
   const handleRecenter = () => {
     webViewRef.current?.postMessage(
-      JSON.stringify({ type: "recenter", lat: userLocation.lat, lng: userLocation.lng }),
+      JSON.stringify({
+        type: "recenter",
+        lat: userLocation.lat,
+        lng: userLocation.lng,
+      }),
     );
   };
 
@@ -216,22 +230,25 @@ const MapViewComponent: React.FC<MapViewProps> = ({
           )}
         />
 
-        <TouchableOpacity style={s.recenterBtn} onPress={handleRecenter} activeOpacity={0.8}>
+        <TouchableOpacity
+          style={s.recenterBtn}
+          onPress={handleRecenter}
+          activeOpacity={0.8}
+        >
           <Text style={s.recenterIcon}>📍</Text>
         </TouchableOpacity>
 
         <View style={s.countBadge}>
           <Text style={s.countText}>
-            {incidents.length} incident{incidents.length !== 1 ? "s" : ""} nearby
+            {incidents.length} incident{incidents.length !== 1 ? "s" : ""}{" "}
+            nearby
           </Text>
         </View>
       </View>
 
       {/* Incident List */}
       <View style={s.listContainer}>
-        <Text style={s.listTitle}>
-          Nearby Incidents ({incidents.length})
-        </Text>
+        <Text style={s.listTitle}>Nearby Incidents ({incidents.length})</Text>
         <ScrollView style={s.list} showsVerticalScrollIndicator={false}>
           {incidents.length === 0 ? (
             <View style={s.emptyState}>
@@ -247,19 +264,39 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                 onPress={() => onIncidentPress(incident)}
                 activeOpacity={0.8}
               >
-                <View style={[s.cardAccent, { backgroundColor: getIncidentColor(incident.type) }]} />
+                <View
+                  style={[
+                    s.cardAccent,
+                    { backgroundColor: getIncidentColor(incident.type) },
+                  ]}
+                />
                 <View style={s.cardBody}>
                   <View style={s.cardRow}>
-                    <View style={[s.cardEmojiWrap, { backgroundColor: getIncidentColor(incident.type) + "18" }]}>
-                      <Text style={s.cardEmoji}>{getIncidentEmoji(incident.type)}</Text>
+                    <View
+                      style={[
+                        s.cardEmojiWrap,
+                        {
+                          backgroundColor:
+                            getIncidentColor(incident.type) + "18",
+                        },
+                      ]}
+                    >
+                      <Text style={s.cardEmoji}>
+                        {getIncidentEmoji(incident.type)}
+                      </Text>
                     </View>
                     <View style={s.cardInfo}>
                       <Text style={s.cardType}>{incident.type}</Text>
-                      <Text style={s.cardTime}>{getTimeAgo(incident.createdAt)}</Text>
+                      <Text style={s.cardTime}>
+                        {getTimeAgo(incident.createdAt)}
+                      </Text>
                     </View>
                     <View style={s.cardDistBadge}>
                       <Text style={s.cardDist}>
-                        {getDistanceKm(userLocation, incident.location).toFixed(1)} km
+                        {getDistanceKm(userLocation, incident.location).toFixed(
+                          1,
+                        )}{" "}
+                        km
                       </Text>
                     </View>
                   </View>
@@ -271,9 +308,41 @@ const MapViewComponent: React.FC<MapViewProps> = ({
                       <Text style={s.upvoteIcon}>👍</Text>
                       <Text style={s.upvoteCount}>{incident.upvotes}</Text>
                     </View>
-                    <View style={[s.statusPill, { backgroundColor: incident.status === "ACTIVE" ? theme.colors.success + "22" : theme.colors.textMuted + "22" }]}>
-                      <View style={[s.statusDot, { backgroundColor: incident.status === "ACTIVE" ? theme.colors.success : theme.colors.textMuted }]} />
-                      <Text style={[s.statusText, { color: incident.status === "ACTIVE" ? theme.colors.success : theme.colors.textMuted }]}>{incident.status}</Text>
+                    <View
+                      style={[
+                        s.statusPill,
+                        {
+                          backgroundColor:
+                            incident.status === "ACTIVE"
+                              ? theme.colors.success + "22"
+                              : theme.colors.textMuted + "22",
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          s.statusDot,
+                          {
+                            backgroundColor:
+                              incident.status === "ACTIVE"
+                                ? theme.colors.success
+                                : theme.colors.textMuted,
+                          },
+                        ]}
+                      />
+                      <Text
+                        style={[
+                          s.statusText,
+                          {
+                            color:
+                              incident.status === "ACTIVE"
+                                ? theme.colors.success
+                                : theme.colors.textMuted,
+                          },
+                        ]}
+                      >
+                        {incident.status}
+                      </Text>
                     </View>
                   </View>
                 </View>
@@ -303,38 +372,118 @@ const createThemedStyles = (theme: Theme) => {
     container: { flex: 1, backgroundColor: t.background },
     mapContainer: { height: MAP_HEIGHT, position: "relative" },
     map: { flex: 1 },
-    mapLoading: { ...StyleSheet.absoluteFillObject, backgroundColor: t.surface, justifyContent: "center", alignItems: "center" },
+    mapLoading: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: t.surface,
+      justifyContent: "center",
+      alignItems: "center",
+    },
     mapLoadingText: { fontSize: 16, color: t.textSecondary },
-    recenterBtn: { position: "absolute", bottom: 14, left: 14, width: 42, height: 42, borderRadius: 21, backgroundColor: t.surface, justifyContent: "center", alignItems: "center", shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 6, elevation: 4, borderWidth: 1, borderColor: t.border },
+    recenterBtn: {
+      position: "absolute",
+      bottom: 14,
+      left: 14,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: t.surface,
+      justifyContent: "center",
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 4,
+      borderWidth: 1,
+      borderColor: t.border,
+    },
     recenterIcon: { fontSize: 20 },
-    countBadge: { position: "absolute", top: 14, left: 14, backgroundColor: theme.dark ? "rgba(22,27,34,0.85)" : "rgba(0,0,0,0.65)", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 20 },
+    countBadge: {
+      position: "absolute",
+      top: 14,
+      left: 14,
+      backgroundColor: theme.dark ? "rgba(22,27,34,0.85)" : "rgba(0,0,0,0.65)",
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+    },
     countText: { color: "#fff", fontSize: 12, fontWeight: "600" },
     listContainer: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
-    listTitle: { fontSize: 17, fontWeight: "700", color: t.text, marginBottom: 12 },
+    listTitle: {
+      fontSize: 17,
+      fontWeight: "700",
+      color: t.text,
+      marginBottom: 12,
+    },
     list: { flex: 1 },
     emptyState: { paddingVertical: 40, alignItems: "center" },
     emptyIcon: { fontSize: 40, marginBottom: 10 },
     emptyText: { fontSize: 16, fontWeight: "600", color: t.text },
     emptySub: { fontSize: 13, color: t.textMuted, marginTop: 4 },
-    card: { flexDirection: "row", backgroundColor: t.cardBg, borderRadius: 14, marginBottom: 10, overflow: "hidden", shadowColor: t.cardShadow, shadowOffset: { width: 0, height: 2 }, shadowOpacity: theme.dark ? 0.3 : 0.08, shadowRadius: 8, elevation: 3, borderWidth: theme.dark ? 1 : 0, borderColor: t.border },
+    card: {
+      flexDirection: "row",
+      backgroundColor: t.cardBg,
+      borderRadius: 14,
+      marginBottom: 10,
+      overflow: "hidden",
+      shadowColor: t.cardShadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: theme.dark ? 0.3 : 0.08,
+      shadowRadius: 8,
+      elevation: 3,
+      borderWidth: theme.dark ? 1 : 0,
+      borderColor: t.border,
+    },
     cardAccent: { width: 4 },
     cardBody: { flex: 1, padding: 14 },
     cardRow: { flexDirection: "row", alignItems: "center", marginBottom: 8 },
-    cardEmojiWrap: { width: 40, height: 40, borderRadius: 12, justifyContent: "center", alignItems: "center", marginRight: 10 },
+    cardEmojiWrap: {
+      width: 40,
+      height: 40,
+      borderRadius: 12,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 10,
+    },
     cardEmoji: { fontSize: 20 },
     cardInfo: { flex: 1 },
     cardType: { fontSize: 14, fontWeight: "700", color: t.text },
     cardTime: { fontSize: 11, color: t.textMuted, marginTop: 2 },
-    cardDistBadge: { backgroundColor: t.primary + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8 },
+    cardDistBadge: {
+      backgroundColor: t.primary + "18",
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 8,
+    },
     cardDist: { fontSize: 12, fontWeight: "700", color: t.primary },
-    cardDesc: { fontSize: 13, color: t.textSecondary, lineHeight: 18, marginBottom: 10 },
-    cardFooter: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    cardDesc: {
+      fontSize: 13,
+      color: t.textSecondary,
+      lineHeight: 18,
+      marginBottom: 10,
+    },
+    cardFooter: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
     upvoteWrap: { flexDirection: "row", alignItems: "center" },
     upvoteIcon: { fontSize: 14, marginRight: 4 },
     upvoteCount: { fontSize: 12, color: t.textSecondary, fontWeight: "600" },
-    statusPill: { flexDirection: "row", alignItems: "center", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 6 },
+    statusPill: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
     statusDot: { width: 6, height: 6, borderRadius: 3, marginRight: 5 },
-    statusText: { fontSize: 10, fontWeight: "700", textTransform: "uppercase", letterSpacing: 0.3 },
+    statusText: {
+      fontSize: 10,
+      fontWeight: "700",
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+    },
   });
 };
 

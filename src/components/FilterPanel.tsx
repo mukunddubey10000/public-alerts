@@ -71,7 +71,12 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
   const t = theme.colors;
 
   return (
-    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="fade"
+      transparent
+      onRequestClose={onClose}
+    >
       <View style={s.overlay}>
         <View style={s.panel}>
           {/* Handle bar */}
@@ -103,7 +108,15 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                     onPress={() => toggleType(type)}
                     activeOpacity={0.7}
                   >
-                    <View style={[s.checkbox, checked && { backgroundColor: t.primary, borderColor: t.primary }]}>
+                    <View
+                      style={[
+                        s.checkbox,
+                        checked && {
+                          backgroundColor: t.primary,
+                          borderColor: t.primary,
+                        },
+                      ]}
+                    >
                       {checked && <Text style={s.checkmark}>✓</Text>}
                     </View>
                     <Text style={s.checkboxLabel}>{type}</Text>
@@ -122,11 +135,24 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                   return (
                     <TouchableOpacity
                       key={r}
-                      style={[s.radiusBtn, sel && { backgroundColor: t.primary, borderColor: t.primary }]}
+                      style={[
+                        s.radiusBtn,
+                        sel && {
+                          backgroundColor: t.primary,
+                          borderColor: t.primary,
+                        },
+                      ]}
                       onPress={() => setFilters((p) => ({ ...p, radiusKm: r }))}
                       activeOpacity={0.7}
                     >
-                      <Text style={[s.radiusBtnText, sel && { color: t.textInverse }]}>{r} km</Text>
+                      <Text
+                        style={[
+                          s.radiusBtnText,
+                          sel && { color: t.textInverse },
+                        ]}
+                      >
+                        {r} km
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -146,9 +172,15 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
                     activeOpacity={0.7}
                   >
                     <View style={[s.radio, sel && { borderColor: t.primary }]}>
-                      {sel && <View style={[s.radioDot, { backgroundColor: t.primary }]} />}
+                      {sel && (
+                        <View
+                          style={[s.radioDot, { backgroundColor: t.primary }]}
+                        />
+                      )}
                     </View>
-                    <Text style={s.radioLabel}>{opt.charAt(0).toUpperCase() + opt.slice(1)}</Text>
+                    <Text style={s.radioLabel}>
+                      {opt.charAt(0).toUpperCase() + opt.slice(1)}
+                    </Text>
                   </TouchableOpacity>
                 );
               })}
@@ -157,17 +189,26 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
             {/* Summary */}
             <View style={s.infoBox}>
               <Text style={s.infoText}>
-                Showing {filters.types.length} type(s) within {filters.radiusKm} km, sorted by {filters.sortBy}
+                Showing {filters.types.length} type(s) within {filters.radiusKm}{" "}
+                km, sorted by {filters.sortBy}
               </Text>
             </View>
           </ScrollView>
 
           {/* Footer */}
           <View style={s.footer}>
-            <TouchableOpacity style={s.resetBtn} onPress={handleReset} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={s.resetBtn}
+              onPress={handleReset}
+              activeOpacity={0.7}
+            >
               <Text style={s.resetBtnText}>Reset</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={s.applyBtn} onPress={handleApply} activeOpacity={0.85}>
+            <TouchableOpacity
+              style={s.applyBtn}
+              onPress={handleApply}
+              activeOpacity={0.85}
+            >
               <Text style={s.applyBtnText}>Apply Filters</Text>
             </TouchableOpacity>
           </View>
@@ -179,47 +220,164 @@ const FilterPanel: React.FC<FilterPanelProps> = ({
 
 const getEmoji = (type: Incident["type"]): string => {
   switch (type) {
-    case "ACCIDENT": return "🚗";
-    case "OUTAGE": return "⚡";
-    case "CONSTRUCTION": return "🏗️";
-    case "HAZARD": return "⚠️";
-    default: return "📍";
+    case "ACCIDENT":
+      return "🚗";
+    case "OUTAGE":
+      return "⚡";
+    case "CONSTRUCTION":
+      return "🏗️";
+    case "HAZARD":
+      return "⚠️";
+    default:
+      return "📍";
   }
 };
 
 const createThemedStyles = (theme: Theme) => {
   const t = theme.colors;
   return StyleSheet.create({
-    overlay: { flex: 1, backgroundColor: t.overlay, justifyContent: "center", alignItems: "center" },
-    panel: { width: "88%", maxHeight: "82%", backgroundColor: t.surface, borderRadius: 24, overflow: "hidden" },
+    overlay: {
+      flex: 1,
+      backgroundColor: t.overlay,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    panel: {
+      width: "88%",
+      maxHeight: "82%",
+      backgroundColor: t.surface,
+      borderRadius: 24,
+      overflow: "hidden",
+    },
     handleRow: { alignItems: "center", paddingTop: 12, paddingBottom: 4 },
-    handle: { width: 40, height: 4, borderRadius: 2, backgroundColor: t.border },
-    header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: t.separator },
+    handle: {
+      width: 40,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: t.border,
+    },
+    header: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: t.separator,
+    },
     title: { fontSize: 18, fontWeight: "800", color: t.text },
     subtitle: { fontSize: 12, color: t.textMuted, marginTop: 2 },
-    closeBtn: { width: 34, height: 34, borderRadius: 17, backgroundColor: t.background, justifyContent: "center", alignItems: "center" },
+    closeBtn: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      backgroundColor: t.background,
+      justifyContent: "center",
+      alignItems: "center",
+    },
     closeBtnText: { fontSize: 16, color: t.textSecondary },
     content: { paddingHorizontal: 20, paddingVertical: 16 },
     section: { marginBottom: 22 },
-    sectionTitle: { fontSize: 12, fontWeight: "700", color: t.textMuted, marginBottom: 10, textTransform: "uppercase", letterSpacing: 0.8 },
-    checkboxRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: t.background, marginBottom: 6 },
-    checkbox: { width: 22, height: 22, borderRadius: 6, borderWidth: 2, borderColor: t.border, justifyContent: "center", alignItems: "center", marginRight: 12 },
+    sectionTitle: {
+      fontSize: 12,
+      fontWeight: "700",
+      color: t.textMuted,
+      marginBottom: 10,
+      textTransform: "uppercase",
+      letterSpacing: 0.8,
+    },
+    checkboxRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: t.background,
+      marginBottom: 6,
+    },
+    checkbox: {
+      width: 22,
+      height: 22,
+      borderRadius: 6,
+      borderWidth: 2,
+      borderColor: t.border,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
     checkmark: { color: "#fff", fontSize: 13, fontWeight: "bold" },
     checkboxLabel: { flex: 1, fontSize: 14, color: t.text, fontWeight: "600" },
     typeEmoji: { fontSize: 18 },
     radiusRow: { flexDirection: "row", flexWrap: "wrap", marginHorizontal: -4 },
-    radiusBtn: { flex: 1, minWidth: "20%", paddingVertical: 10, marginHorizontal: 4, borderRadius: 10, borderWidth: 1.5, borderColor: t.border, alignItems: "center", backgroundColor: t.background },
+    radiusBtn: {
+      flex: 1,
+      minWidth: "20%",
+      paddingVertical: 10,
+      marginHorizontal: 4,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      borderColor: t.border,
+      alignItems: "center",
+      backgroundColor: t.background,
+    },
     radiusBtnText: { fontSize: 13, color: t.text, fontWeight: "700" },
-    radioRow: { flexDirection: "row", alignItems: "center", paddingVertical: 10, paddingHorizontal: 12, borderRadius: 10, backgroundColor: t.background, marginBottom: 6 },
-    radio: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: t.border, justifyContent: "center", alignItems: "center", marginRight: 12 },
+    radioRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 10,
+      paddingHorizontal: 12,
+      borderRadius: 10,
+      backgroundColor: t.background,
+      marginBottom: 6,
+    },
+    radio: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: t.border,
+      justifyContent: "center",
+      alignItems: "center",
+      marginRight: 12,
+    },
     radioDot: { width: 10, height: 10, borderRadius: 5 },
     radioLabel: { fontSize: 14, color: t.text, fontWeight: "600" },
-    infoBox: { backgroundColor: t.primary + "15", paddingHorizontal: 14, paddingVertical: 12, borderRadius: 10, marginTop: 4 },
-    infoText: { fontSize: 12, color: t.primary, lineHeight: 18, fontWeight: "500" },
-    footer: { flexDirection: "row", paddingHorizontal: 20, paddingVertical: 16, borderTopWidth: 1, borderTopColor: t.separator },
-    resetBtn: { flex: 1, paddingVertical: 12, borderRadius: 10, alignItems: "center", marginRight: 8, backgroundColor: t.background },
+    infoBox: {
+      backgroundColor: t.primary + "15",
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 10,
+      marginTop: 4,
+    },
+    infoText: {
+      fontSize: 12,
+      color: t.primary,
+      lineHeight: 18,
+      fontWeight: "500",
+    },
+    footer: {
+      flexDirection: "row",
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      borderTopWidth: 1,
+      borderTopColor: t.separator,
+    },
+    resetBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: "center",
+      marginRight: 8,
+      backgroundColor: t.background,
+    },
     resetBtnText: { fontSize: 14, fontWeight: "700", color: t.textSecondary },
-    applyBtn: { flex: 2, paddingVertical: 12, borderRadius: 10, alignItems: "center", backgroundColor: t.primary },
+    applyBtn: {
+      flex: 2,
+      paddingVertical: 12,
+      borderRadius: 10,
+      alignItems: "center",
+      backgroundColor: t.primary,
+    },
     applyBtnText: { fontSize: 14, fontWeight: "700", color: t.textInverse },
   });
 };
