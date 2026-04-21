@@ -78,4 +78,10 @@ dependencies {
     }
 }
 
+// Prevent codegen-generated viewmanager interfaces from duplicating
+// classes already shipped inside the react-native AAR (old architecture).
+tasks.withType(JavaCompile).configureEach {
+    exclude '**/react/viewmanagers/**'
+}
+
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
