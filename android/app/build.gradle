@@ -64,8 +64,6 @@ android {
 }
 
 dependencies {
-    implementation("com.facebook.react:react-native:+")
-
     if (hermesEnabled.toBoolean()) {
         implementation("com.facebook.react:hermes-engine")
     } else {
