@@ -1,0 +1,12 @@
+FATAL: EBUSY: resource busy or locked, unlink '\\?\C:\Users\Mukund\.gradle\caches\transforms-3\transforms-3.lock'
+Error: EBUSY: resource busy or locked, unlink '\\?\C:\Users\Mukund\.gradle\caches\transforms-3\transforms-3.lock'
+    at unlinkSync (node:fs:1881:3)
+    at _unlinkSync (node:internal/fs/rimraf:214:14)
+    at rimrafSync (node:internal/fs/rimraf:195:7)
+    at node:internal/fs/rimraf:253:9
+    at Array.forEach (<anonymous>)
+    at _rmdirSync (node:internal/fs/rimraf:250:7)
+    at rimrafSync (node:internal/fs/rimraf:193:7)
+    at Object.rmSync (node:fs:1271:10)
+    at rimraf (E:\Projects\public-alerts\scripts\clean-and-build-release.js:88:8)
+    at E:\Projects\public-alerts\scripts\clean-and-build-release.js:96:7
