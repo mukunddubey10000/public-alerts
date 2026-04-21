@@ -12,11 +12,13 @@ var os = require("os");
 var path = require("path");
 
 var PROJECT_ROOT = path.resolve(__dirname, "..");
-var LOG_DIR = path.join(PROJECT_ROOT, "build-logs");  // Log folder
+var LOG_DIR = path.join(PROJECT_ROOT, "build-logs"); // Log folder
 
-// Fix the timestamp format to remove any extra dots or invalid characters
-var TIMESTAMP = new Date().toISOString().replace(/[:\-T]/g, "").slice(0, 15);  // Ensure no trailing dot
-var ERROR_LOG = path.join(LOG_DIR, "build-error-" + "hi" + ".txt");  // Log file with .txt extension
+var TIMESTAMP = new Date()
+  .toISOString()
+  .replace(/[:\-T]/g, "")
+  .slice(0, 15);
+var ERROR_LOG = path.join(LOG_DIR, "build-error-" + TIMESTAMP + ".txt");
 
 var IS_WIN = process.platform === "win32";
 var GRADLEW = IS_WIN ? "gradlew.bat" : "./gradlew";
@@ -28,15 +30,16 @@ var APK_OUTPUT = path.join(
   "outputs",
   "apk",
   "release",
-  "app-release.apk"
+  "app-release.apk",
 );
 
-// Ensure the log directory exists
+// Ensure the log directory exists with read/write/execute for everyone
 if (!fs.existsSync(LOG_DIR)) {
-  fs.mkdirSync(LOG_DIR, { recursive: true });
+  fs.mkdirSync(LOG_DIR, { recursive: true, mode: 0o777 });
 }
 
-var logStream = fs.createWriteStream(ERROR_LOG, { flags: "a" });
+// Open log file with read/write permissions for all users
+var logStream = fs.createWriteStream(ERROR_LOG, { flags: "a", mode: 0o666 });
 
 function log(msg) {
   console.log("");
