@@ -38,8 +38,9 @@ if (!fs.existsSync(LOG_DIR)) {
   fs.mkdirSync(LOG_DIR, { recursive: true, mode: 0o777 });
 }
 
-// Open log file with read/write permissions for all users
-var logStream = fs.createWriteStream(ERROR_LOG, { flags: "a", mode: 0o666 });
+function appendLog(text) {
+  fs.appendFileSync(ERROR_LOG, text, { mode: 0o666 });
+}
 
 function log(msg) {
   console.log("");
@@ -63,9 +64,9 @@ function run(cmd, cwd) {
     if (err.stderr) output += err.stderr.toString();
 
     // Log the command and output to the error log
-    logStream.write("COMMAND: " + cmd + "\n");
-    logStream.write("ERROR MESSAGE:\n" + output + "\n");
-    logStream.write("========================================\n\n");
+    appendLog("COMMAND: " + cmd + "\n");
+    appendLog("ERROR MESSAGE:\n" + output + "\n");
+    appendLog("========================================\n\n");
 
     console.error(output);
     throw err;
@@ -134,15 +135,13 @@ try {
   run(GRADLEW + " assembleRelease", androidDir);
 
   // Success — remove log file (it's empty on success)
-  logStream.end();
   rimraf(ERROR_LOG);
 
   log("BUILD SUCCESSFUL");
   console.log("APK location: " + APK_OUTPUT);
   console.log("");
 } catch (err) {
-  // On failure, end the log stream and display failure message
-  logStream.end();
+  // On failure, display failure message
   console.log("");
   console.log("========================================");
   console.log("  BUILD FAILED");
