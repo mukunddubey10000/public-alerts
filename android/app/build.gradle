@@ -78,11 +78,21 @@ dependencies {
     }
 }
 
-// Prevent codegen-generated classes from duplicating those already
-// shipped inside the react-native AAR (old architecture / newArchEnabled=false).
-tasks.withType(JavaCompile).configureEach {
-    exclude '**/react/viewmanagers/**'
-    exclude '**/fbreact/specs/**'
+// RN 0.70 codegen generates Java sources that duplicate classes already in the
+// react-native AAR, causing mergeDexRelease to fail.  Remove the generated
+// duplicates right before compilation so only the AAR copies survive.
+gradle.projectsEvaluated {
+    tasks.matching { it.name.matches(/compile.*JavaWithJavac/) }.each { compileTask ->
+        compileTask.doFirst {
+            def codegenDir = file("${buildDir}/generated/source/codegen/java")
+            if (codegenDir.exists()) {
+                fileTree(codegenDir).matching {
+                    include '**/react/viewmanagers/**'
+                    include '**/fbreact/specs/**'
+                }.each { it.delete() }
+            }
+        }
+    }
 }
 
 apply from: file("../../node_modules/@react-native-community/cli-platform-android/native_modules.gradle"); applyNativeModulesAppBuildGradle(project)
