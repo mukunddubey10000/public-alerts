@@ -14,6 +14,8 @@
     "android:usb": "adb reverse tcp:8081 tcp:8081 && react-native run-android",
     "android:build": "cd android && gradlew assembleDebug && cd ..",
     "android:build:unix": "cd android && ./gradlew assembleDebug && cd ..",
+    "android:release": "cd android && gradlew assembleRelease && cd ..",
+    "android:release:unix": "cd android && ./gradlew assembleRelease && cd ..",
     "android:install": "adb install android/app/build/outputs/apk/debug/app-debug.apk",
     "ios": "react-native run-ios",
     "test": "jest",
